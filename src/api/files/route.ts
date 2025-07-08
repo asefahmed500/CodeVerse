@@ -108,8 +108,31 @@ export async function PUT(request: Request) {
   }
 
   const { fileId, content, name, isOpen, isActive } = await request.json()
+  const userId = (session.user as any).id;
 
   try {
+    const fileToUpdate = await File.findById(fileId);
+    if (!fileToUpdate) {
+        return NextResponse.json({ error: "File not found" }, { status: 404 });
+    }
+
+    // If renaming, check for conflicts first
+    if (name !== undefined && name !== fileToUpdate.name) {
+      const existingFile = await File.findOne({
+        name,
+        parentId: fileToUpdate.parentId,
+        userId: userId,
+        _id: { $ne: fileId }
+      });
+  
+      if (existingFile) {
+        return NextResponse.json(
+          { error: `A ${existingFile.isFolder ? 'folder' : 'file'} with the name "${name}" already exists.` }, 
+          { status: 409 }
+        );
+      }
+    }
+
     const updates: any = { updatedAt: new Date() }
     if (content !== undefined) updates.content = content
     if (name !== undefined) updates.name = name
@@ -119,7 +142,7 @@ export async function PUT(request: Request) {
     if (isActive) {
       await File.updateMany(
         { 
-          userId: (session.user as any).id,
+          userId,
           isActive: true,
           _id: { $ne: fileId }
         },
@@ -128,12 +151,13 @@ export async function PUT(request: Request) {
     }
 
     const updatedFile = await File.findOneAndUpdate(
-      { _id: fileId, userId: (session.user as any).id },
+      { _id: fileId, userId: userId },
       { $set: updates },
       { new: true }
     )
 
     if (!updatedFile) {
+      // This case should be rare since we already checked
       return NextResponse.json({ error: "File not found" }, { status: 404 })
     }
 

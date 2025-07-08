@@ -78,6 +78,8 @@ interface FileSystemContextType {
   deleteFile: (fileId: string) => Promise<void>;
   refreshFiles: () => void;
   getPathForFile: (fileId: string) => string;
+  expandedFolders: Set<string>;
+  toggleFolder: (folderId: string) => void;
 }
 
 const FileSystemContext = createContext<FileSystemContextType | undefined>(undefined);
@@ -88,6 +90,23 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
   const [files, setFiles] = useState<FileType[]>([]);
   const [activeFile, setActiveFile] = useState<FileType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
+  };
+
+  const expandFolder = (folderId: string) => {
+    setExpandedFolders(prev => new Set(prev).add(folderId));
+  }
 
   const fetchFiles = useCallback(async () => {
     if (status !== 'authenticated') {
@@ -190,6 +209,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
         const deactivated = deactivateAllFiles(prev);
         return addFileToTree(deactivated, newFile)
       });
+      if(parentId) expandFolder(parentId);
       setActiveFile(newFile);
       router.push(`/editor/${newFile._id}`);
       return newFile;
@@ -214,6 +234,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
       }
       const newFolder = await res.json();
       setFiles(prev => addFileToTree(prev, newFolder));
+      if(parentId) expandFolder(parentId);
       return newFolder;
     } catch (e) {
       toast.error("An unexpected error occurred.");
@@ -222,11 +243,11 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
   };
 
   const updateFile = async (fileId: string, updates: Partial<FileType>) => {
-    const previousFiles = files;
+    const previousFiles = [...files];
     
     // Optimistic UI update
     setFiles(prev => {
-        let tree = prev;
+        let tree = [...prev];
         if (updates.isActive) {
             tree = deactivateAllFiles(tree);
         }
@@ -246,7 +267,10 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ fileId, ...updates }),
         });
-        if (!res.ok) throw new Error("Failed to update file on server");
+        if (!res.ok) {
+          const { error } = await res.json();
+          throw new Error(error || "Failed to update file on server");
+        }
         
         const finalUpdatedFile = await res.json();
         // Sync with server state
@@ -255,8 +279,8 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
             setActiveFile(finalUpdatedFile);
         }
 
-    } catch (error) {
-        toast.error(`Failed to update file.`);
+    } catch (error: any) {
+        toast.error(error.message || `Failed to update file.`);
         setFiles(previousFiles); // Rollback on error
     }
   };
@@ -309,6 +333,8 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     deleteFile,
     refreshFiles: fetchFiles,
     getPathForFile,
+    expandedFolders,
+    toggleFolder
   };
 
   return React.createElement(FileSystemContext.Provider, { value }, children);

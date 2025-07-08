@@ -152,16 +152,20 @@ export function Terminal({
                 term.writeln(`\r\n${cmd}: missing file path`);
                 break;
             }
-            const { node: fileToRun } = findNodeByPath(files, pathArg);
+            const fullPath = pathArg.startsWith('/') ? pathArg : `${currentPath === '/' ? '' : currentPath}/${pathArg}`;
+            const { node: fileToRun } = findNodeByPath(files, fullPath);
             const langConfig = fileToRun ? getLanguageConfigFromFilename(fileToRun.name) : null;
             
             if (fileToRun && !fileToRun.isFolder && langConfig && langConfig.judge0Id) {
-                term.writeln(`\r\n\x1b[33mRunning ${fileToRun.name}...\x1b[0m`);
+                term.writeln(`\r\n\x1b[33mExecuting ${fileToRun.name} with ${langConfig.name} runtime...\x1b[0m`);
                 const { logs, error } = await executeCode(fileToRun.content, langConfig.judge0Id);
                 term.writeln('');
-                logs.forEach(log => term.writeln(`\r${log}`));
+                if (logs.length > 0) {
+                    term.writeln('\r\x1b[1;32mOutput:\x1b[0m');
+                    logs.forEach(log => term.writeln(`\r${log}`));
+                }
                 if (error) {
-                    term.writeln(`\r\x1b[1;31mExecution failed: ${error}\x1b[0m`);
+                    term.writeln(`\r\x1b[1;31mError: ${error}\x1b[0m`);
                 }
             } else {
                 term.writeln(`\r\n${cmd}: cannot execute '${pathArg}'. Not a valid or runnable file.`);

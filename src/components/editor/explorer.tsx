@@ -27,68 +27,43 @@ export function Explorer() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <div className="h-full flex flex-col bg-card text-card-foreground select-none">
-          <div className="p-2 border-b border-border flex items-center justify-between group">
-            <h3 className="font-bold text-sm uppercase">Explorer</h3>
-            <div className="flex items-center">
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => createFile('Untitled')}>
-                <FilePlus size={16}/>
-              </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => createFolder('New Folder')}>
-                <FolderPlus size={16}/>
-              </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={refreshFiles}>
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
-              </Button>
-            </div>
-          </div>
-          <FileTree />
+    <div className="h-full flex flex-col bg-card text-card-foreground select-none">
+        <div className="p-2 border-b border-border flex items-center justify-between group">
+        <h3 className="font-bold text-sm uppercase">Explorer</h3>
+        <div className="flex items-center">
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => createFile('Untitled')}>
+            <FilePlus size={16}/>
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => createFolder('New Folder')}>
+            <FolderPlus size={16}/>
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={refreshFiles}>
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
+            </Button>
         </div>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-48" align="start">
-        <DropdownMenuItem onSelect={() => createFile('Untitled')}>
-          <FilePlus className="mr-2 h-4 w-4" />
-          <span>New File</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => createFolder('New Folder')}>
-          <FolderPlus className="mr-2 h-4 w-4" />
-          <span>New Folder</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </div>
+        <FileTree />
+    </div>
   );
 }
 
 function FileTree() {
-  const { files, updateFile, loading } = useFileSystem();
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const { files, updateFile, loading, expandedFolders, toggleFolder } = useFileSystem();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [isProjectExpanded, setIsProjectExpanded] = useState(true);
 
-  const toggleFolder = (folderId: string) => {
-    setExpandedFolders(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(folderId)) {
-        newSet.delete(folderId);
-      } else {
-        newSet.add(folderId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleRename = (file: FileType) => {
+  const handleRename = async (file: FileType) => {
     if (!editingValue.trim() || editingValue === file.name) {
         setEditingId(null);
         return;
     }
-    updateFile(file._id, { name: editingValue }).then(() => {
-        toast.success(`Renamed to ${editingValue}`);
-        setEditingId(null);
-    }).catch(() => toast.error('Failed to rename'));
+    try {
+      await updateFile(file._id, { name: editingValue });
+      toast.success(`Renamed to ${editingValue}`);
+    } finally {
+      setEditingId(null);
+    }
   };
 
   const renderFile = (file: FileType, depth: number) => (
@@ -97,7 +72,7 @@ function FileTree() {
       file={file}
       depth={depth}
       isExpanded={expandedFolders.has(file._id)}
-      onToggleExpand={toggleFolder}
+      onToggleExpand={() => toggleFolder(file._id)}
       onRename={handleRename}
       editingId={editingId}
       setEditingId={setEditingId}
@@ -141,7 +116,7 @@ function FileTreeItem({
   isExpanded: boolean;
   onToggleExpand: (id: string) => void;
   children: React.ReactNode;
-  onRename: (file: FileType) => void;
+  onRename: (file: FileType) => Promise<void>;
   editingId: string | null;
   setEditingId: (id: string | null) => void;
   editingValue: string;
@@ -152,14 +127,17 @@ function FileTreeItem({
 
   const isEditing = editingId === file._id;
 
-  const handleItemClick = () => {
+  const handleItemClick = (e: React.MouseEvent) => {
     if (isEditing) return;
-    if (file.isFolder) {
-      onToggleExpand(file._id);
-    } else {
+    if(e.detail === 2 && !file.isFolder){ // Double click to open
       router.push(`/editor/${file._id}`);
+      setActiveFile(file);
+    } else if (file.isFolder) {
+      onToggleExpand(file._id);
+      setActiveFile(file);
+    } else {
+      setActiveFile(file);
     }
-    setActiveFile(file);
   };
   
   return (
@@ -170,6 +148,7 @@ function FileTreeItem({
           className={`flex items-center py-1 px-2 rounded hover:bg-accent cursor-pointer group ${activeFile?._id === file._id ? "bg-muted" : ""}`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={handleItemClick}
+          onContextMenu={(e) => e.currentTarget.focus()} // Focus for dropdown trigger
         >
           {file.isFolder ? (
             isExpanded ? <ChevronDown size={16} className="mr-1" /> : <ChevronRight size={16} className="mr-1" />
@@ -194,22 +173,22 @@ function FileTreeItem({
       <DropdownMenuContent className="w-48" align="start">
           {file.isFolder && (
             <>
-              <DropdownMenuItem onSelect={(e) => {e.stopPropagation(); createFile('Untitled', file._id)}}>
+              <DropdownMenuItem onSelect={() => createFile('Untitled', file._id)}>
                 <FilePlus className="mr-2 h-4 w-4" />
                 <span>New File</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={(e) => {e.stopPropagation(); createFolder('New Folder', file._id)}}>
+              <DropdownMenuItem onSelect={() => createFolder('New Folder', file._id)}>
                 <FolderPlus className="mr-2 h-4 w-4" />
                 <span>New Folder</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuItem onSelect={(e) => {e.stopPropagation(); setEditingId(file._id); setEditingValue(file.name);}}>
+          <DropdownMenuItem onSelect={() => { setEditingId(file._id); setEditingValue(file.name); }}>
             <Pencil className="mr-2 h-4 w-4" />
             <span>Rename</span>
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => {e.stopPropagation(); deleteFile(file._id);}}>
+          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={() => deleteFile(file._id)}>
             <X className="mr-2 h-4 w-4" />
             <span>Delete</span>
           </DropdownMenuItem>
