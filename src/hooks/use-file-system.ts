@@ -81,32 +81,23 @@ const useFileSystemStore = create<FileSystemState>()(
       },
       
       getPathForFile: (fileId: string): string => {
-        const fileMap = new Map(get().allFiles.map(f => [f._id, f]));
-        const buildPath = (fId: string): string => {
-            const file = fileMap.get(fId);
-            if (!file) return '';
-            if (!file.parentId) return `/${file.name}`;
-            const parent = fileMap.get(file.parentId);
-            // This is a safeguard against orphaned files, should not happen in normal operation
-            if (!parent) return `/${file.name}`; 
-            const parentPath = buildPath(parent._id);
-            // Handle root case properly
-            return parentPath === '/' ? `/${parent.name}/${file.name}` : `${parentPath}/${file.name}`;
-        };
-
-        const file = fileMap.get(fileId);
-        if(!file) return '';
-        if(!file.parentId) return `/${file.name}`;
+        const allFiles = get().allFiles;
+        if (allFiles.length === 0) return '';
+        const fileMap = new Map(allFiles.map(f => [f._id, f]));
         
-        // A slightly different approach to ensure correctness
+        const file = fileMap.get(fileId);
+        if (!file) return '';
+
         const pathParts: string[] = [file.name];
         let currentParentId = file.parentId;
-        while(currentParentId) {
+
+        while (currentParentId) {
           const parent = fileMap.get(currentParentId);
           if (parent) {
             pathParts.unshift(parent.name);
             currentParentId = parent.parentId;
           } else {
+            // Orphan file, stop building path
             break;
           }
         }
@@ -312,46 +303,50 @@ const useFileSystemStore = create<FileSystemState>()(
       },
       
       setWorkspaceFromGitHub: async (owner: string, repo: string) => {
+        const toastId = toast.loading(`Cloning ${owner}/${repo}...`);
         try {
             const res = await fetch(`/api/github?action=getRepoTree&owner=${owner}&repo=${repo}`);
-            const ghFiles = await res.json();
-            if (!res.ok) throw new Error(ghFiles.error || "Failed to clone repository.");
+            const ghItems: { path: string; content?: string; type: 'file' | 'dir' }[] = await res.json();
 
-            if (ghFiles.length === 0) {
+            if (!res.ok) {
+              throw new Error((ghItems as any).error || "Failed to clone repository.");
+            }
+
+            if (ghItems.length === 0) {
               toast.warning("Repository is empty or contains no supported text files.");
+              toast.dismiss(toastId);
               return;
             }
             
-            // Build file tree from flat path list
             const newFileTree: FileType[] = [];
             const dirMap = new Map<string, FileType>();
 
-            // Sort files to ensure directories are created before files inside them
-            ghFiles.sort((a: any, b: any) => a.path.localeCompare(b.path));
+            // Sort by path string to ensure directories are created before files inside them
+            ghItems.sort((a, b) => a.path.localeCompare(b.path));
 
-            for (const fileData of ghFiles) {
-                const parts = fileData.path.split('/');
-                const fileName = parts.pop()!;
+            for (const itemData of ghItems) {
+                const parts = itemData.path.split('/');
+                const itemName = parts.pop()!;
                 const dirPath = parts.join('/');
                 
                 const parent = dirPath ? dirMap.get(dirPath) : null;
 
                 const newItem: FileType = {
                   _id: uuidv4(),
-                  name: fileName,
-                  content: fileData.content || '',
-                  isFolder: fileData.content === undefined, // Simple check if it's a directory
+                  name: itemName,
+                  content: itemData.type === 'file' ? itemData.content || '' : '',
+                  isFolder: itemData.type === 'dir',
                   parentId: parent ? parent._id : null,
-                  language: fileData.content !== undefined ? getLanguageConfigFromFilename(fileName).monacoLanguage : 'plaintext',
+                  language: itemData.type === 'file' ? getLanguageConfigFromFilename(itemName).monacoLanguage : 'plaintext',
                   isOpen: false,
                   isActive: false,
-                  children: fileData.content === undefined ? [] : undefined,
+                  children: itemData.type === 'dir' ? [] : undefined,
                   createdAt: new Date(),
                   updatedAt: new Date(),
                 };
 
                 if (newItem.isFolder) {
-                  dirMap.set(fileData.path, newItem);
+                  dirMap.set(itemData.path, newItem);
                 }
 
                 if (parent) {
@@ -368,10 +363,10 @@ const useFileSystemStore = create<FileSystemState>()(
             if(firstFile) {
                 get().setActiveFileId(firstFile._id);
                 get().updateFile(firstFile._id, { isOpen: true, isActive: true });
-                return firstFile._id; // To allow redirection
             }
+            toast.success(`Cloned ${repo} successfully.`, { id: toastId });
         } catch (error: any) {
-            toast.error(error.message);
+            toast.error(error.message, { id: toastId });
         }
       },
       

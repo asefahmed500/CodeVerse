@@ -9,36 +9,41 @@ const textFileExtensions = [
     '.env', '.babelrc', '.eslintrc', '.prettierrc', 'package.json', 'tsconfig.json'
 ];
 
-async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, path: string = ''): Promise<{ path: string, content: string }[]> {
+async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, path: string = ''): Promise<{ path: string, content?: string, type: 'file' | 'dir' }[]> {
     try {
         const response = await octokit.rest.repos.getContent({ owner, repo, path });
         const contents = response.data;
 
         if (!Array.isArray(contents)) {
             if (contents.type === 'file' && contents.content) {
-                return [{ path: contents.path, content: Buffer.from(contents.content, 'base64').toString('utf-8') }];
+                return [{ 
+                    path: contents.path, 
+                    content: Buffer.from(contents.content, 'base64').toString('utf-8'),
+                    type: 'file'
+                }];
             }
             return [];
         }
 
-        const files: { path: string, content: string }[] = [];
+        const items: { path: string, content?: string, type: 'file' | 'dir' }[] = [];
         for (const item of contents) {
             if (item.type === 'dir') {
-                const subFiles = await fetchRepoContents(octokit, owner, repo, item.path);
-                files.push(...subFiles);
+                items.push({ path: item.path, type: 'dir' });
+                const subItems = await fetchRepoContents(octokit, owner, repo, item.path);
+                items.push(...subItems);
             } else if (item.type === 'file' && item.download_url && textFileExtensions.some(ext => item.name.endsWith(ext) || item.name.toLowerCase().includes(ext.slice(1)))) {
                  try {
                     const fileResponse = await fetch(item.download_url);
                     if(fileResponse.ok) {
                         const content = await fileResponse.text();
-                        files.push({ path: item.path, content });
+                        items.push({ path: item.path, content, type: 'file' });
                     }
                 } catch (e) {
                     console.warn(`Skipping file ${item.path} due to fetch error.`);
                 }
             }
         }
-        return files;
+        return items;
     } catch (error: any) {
         if (error.status === 404) {
             console.warn(`Path not found: ${path}. Skipping.`);
@@ -72,8 +77,8 @@ export async function GET(request: Request) {
         if (!owner || !repo) {
             return NextResponse.json({ error: "Missing owner or repo" }, { status: 400 });
         }
-        const files = await fetchRepoContents(octokit, owner, repo);
-        return NextResponse.json(files);
+        const items = await fetchRepoContents(octokit, owner, repo);
+        return NextResponse.json(items);
 
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
