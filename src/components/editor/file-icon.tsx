@@ -15,6 +15,11 @@ export const FileIcon = ({ filename, isFolder, isExpanded, className }: { filena
       return <FileCode size={16} className={className || "text-yellow-400"} />;
     case 'python':
       return <FileCode size={16} className={className || "text-green-400"} />;
+    case 'java':
+        return <FileCode size={16} className={className || "text-red-500"} />;
+    case 'c':
+    case 'cpp':
+        return <FileCode size={16} className={className || "text-blue-500"} />;
     case 'json':
       return <FileJson size={16} className={className || "text-yellow-400"} />;
     case 'html':

@@ -9,22 +9,43 @@ export const LANGUAGE_CONFIG: Record<string, {
     name: "JavaScript",
     extensions: [".js", ".jsx"],
     monacoLanguage: "javascript",
-    judge0Id: 93, // NodeJS
+    judge0Id: 93, // NodeJS (18.15.0)
     runner: "node",
   },
   typescript: {
     name: "TypeScript",
     extensions: [".ts", ".tsx"],
     monacoLanguage: "typescript",
-    judge0Id: 74,
+    judge0Id: 94, // TypeScript (5.0.3)
     runner: "node",
   },
   python: {
     name: "Python",
     extensions: [".py"],
     monacoLanguage: "python",
-    judge0Id: 71,
+    judge0Id: 71, // Python (3.8.1)
     runner: "python",
+  },
+  java: {
+    name: "Java",
+    extensions: [".java"],
+    monacoLanguage: "java",
+    judge0Id: 62, // Java (OpenJDK 13.0.1)
+    runner: "run-java",
+  },
+  c: {
+    name: "C",
+    extensions: [".c"],
+    monacoLanguage: "c",
+    judge0Id: 52, // C (GCC 9.2.0)
+    runner: "run-c",
+  },
+  cpp: {
+    name: "C++",
+    extensions: [".cpp", ".cxx"],
+    monacoLanguage: "cpp",
+    judge0Id: 54, // C++ (GCC 9.2.0)
+    runner: "run-cpp",
   },
   html: {
     name: "HTML",

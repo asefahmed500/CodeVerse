@@ -91,6 +91,9 @@ export function Terminal({
             term.writeln('  echo [text]  - Display a line of text');
             term.writeln('  node [file]  - Execute a JS/TS file');
             term.writeln('  python [file]- Execute a Python file');
+            term.writeln('  run-java [file] - Compile and run a Java file');
+            term.writeln('  run-c [file] - Compile and run a C file');
+            term.writeln('  run-cpp [file] - Compile and run a C++ file');
             term.writeln('  clear        - Clear the terminal screen');
             term.writeln('  help         - Show this help message');
             break;
@@ -147,6 +150,9 @@ export function Terminal({
             break;
         case 'node':
         case 'python':
+        case 'run-java':
+        case 'run-c':
+        case 'run-cpp':
             const pathArg = args[0];
             if (!pathArg) {
                 term.writeln(`\r\n${cmd}: missing file path`);
