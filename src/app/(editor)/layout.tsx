@@ -17,7 +17,7 @@ export default async function EditorLayout({
   return (
     <FileSystemProvider>
       <MobileSidebar />
-      <div className="flex flex-col h-screen bg-[#1e1e1e] text-[#cccccc] overflow-hidden">
+      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
         <TitleBar session={session} />
         <div className="flex flex-1 overflow-hidden">
           <ActivityBar />
