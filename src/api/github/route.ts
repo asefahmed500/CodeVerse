@@ -25,7 +25,7 @@ async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, 
             return [];
         }
 
-        let items: { path: string, content?: string, type: 'file' | 'dir' }[] = [];
+        const items: { path: string, content?: string, type: 'file' | 'dir' }[] = [];
         for (const item of contents) {
             if (item.type === 'dir') {
                 items.push({ path: item.path, type: 'dir' });
