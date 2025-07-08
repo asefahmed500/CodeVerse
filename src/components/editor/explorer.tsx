@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ChevronRight, ChevronDown, FolderPlus, FilePlus, RefreshCw, X, Pencil } from "lucide-react";
@@ -121,18 +122,24 @@ function FileTreeItem({
 
   const isEditing = editingId === file._id;
 
-  const handleItemClick = (e: React.MouseEvent) => {
+  const handleItemClick = () => {
     if (isEditing) return;
-    if(e.detail === 2 && !file.isFolder){
-      router.push(`/editor/${file._id}`);
-      setActiveFile(file);
-    } else if (file.isFolder) {
+
+    if (file.isFolder) {
       onToggleExpand(file._id);
       setActiveFile(file);
     } else {
-      setActiveFile(file);
+      router.push(`/editor/${file._id}`);
     }
   };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setActiveFile(file);
+    // The DropdownMenuTrigger will handle opening the menu.
+    // We manually trigger a click to open it, as an alternative to managing open state.
+    (e.currentTarget as HTMLElement).click();
+  }
   
   return (
     <div>
@@ -142,7 +149,7 @@ function FileTreeItem({
           className={`flex items-center py-1 px-2 rounded hover:bg-accent cursor-pointer group ${activeFile?._id === file._id ? "bg-muted" : ""}`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={handleItemClick}
-          onContextMenu={(e) => e.currentTarget.focus()}
+          onContextMenu={handleContextMenu}
         >
           {file.isFolder ? (
             isExpanded ? <ChevronDown size={16} className="mr-1" /> : <ChevronRight size={16} className="mr-1" />
@@ -154,7 +161,10 @@ function FileTreeItem({
                   value={editingValue}
                   onChange={(e) => setEditingValue(e.target.value)}
                   onBlur={() => onRename(file)}
-                  onKeyDown={(e) => e.key === 'Enter' && onRename(file)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') onRename(file);
+                    if (e.key === 'Escape') setEditingId(null);
+                  }}
                   onClick={(e) => e.stopPropagation()}
                   autoFocus
                   className="h-6 text-sm bg-background border-primary"
@@ -167,22 +177,22 @@ function FileTreeItem({
       <DropdownMenuContent className="w-48" align="start">
           {file.isFolder && (
             <>
-              <DropdownMenuItem onSelect={() => createFile('Untitled', file._id)}>
+              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); createFile('Untitled', file._id)}}>
                 <FilePlus className="mr-2 h-4 w-4" />
                 <span>New File</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => createFolder('New Folder', file._id)}>
+              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); createFolder('New Folder', file._id)}}>
                 <FolderPlus className="mr-2 h-4 w-4" />
                 <span>New Folder</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuItem onSelect={() => { setEditingId(file._id); setEditingValue(file.name); }}>
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setEditingId(file._id); setEditingValue(file.name); }}>
             <Pencil className="mr-2 h-4 w-4" />
             <span>Rename</span>
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={() => deleteFile(file._id)}>
+          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => { e.preventDefault(); deleteFile(file._id)}}>
             <X className="mr-2 h-4 w-4" />
             <span>Delete</span>
           </DropdownMenuItem>
