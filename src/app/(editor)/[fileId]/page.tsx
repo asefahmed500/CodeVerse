@@ -37,29 +37,28 @@ export default function EditorFilePage() {
     const file = findFile(fileId);
 
     if (file) {
+      if (file.isFolder) {
+        // Don't open folders in editor, just select in sidebar and redirect
+        setActiveFileId(file._id);
+        router.replace('/editor');
+        return;
+      }
+      
+      // If a valid file is found, make sure it's open and active.
       if (file._id !== activeFileId) {
-        if (!file.isFolder) {
-            updateFile(file._id, { isOpen: true, isActive: true });
-        } else {
-            setActiveFileId(file._id);
-        }
+        updateFile(file._id, { isOpen: true, isActive: true });
       }
     } else {
-      if (fileId !== 'new' && files.length > 0) {
-        // If file not found and it's not the 'new' route, redirect.
-        const firstFile = files.find(f => !f.isFolder);
-        router.push(firstFile ? `/editor/${firstFile._id}` : '/editor');
-      } else if (files.length === 0) {
-        router.push('/editor');
-      }
+      // If file not found, redirect to the root editor page.
+      router.replace('/editor');
     }
-  }, [fileId, files, loading, router, findFile, updateFile, activeFileId, setActiveFileId]);
+  }, [fileId, loading, router, findFile, updateFile, activeFileId, setActiveFileId, files]);
   
   const activeFile = findFile(activeFileId || '');
 
-  if (loading) {
+  if (loading || !activeFile || activeFile.isFolder || activeFileId !== fileId) {
     return (
-      <div className="flex items-center justify-center flex-1 h-full">
+      <div className="flex items-center justify-center flex-1 h-full bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
@@ -81,20 +80,7 @@ export default function EditorFilePage() {
       </ResizablePanel>
       <ResizableHandle withHandle className="hidden md:flex" />
       <ResizablePanel defaultSize={80}>
-        {activeFile && !activeFile.isFolder ? (
-          <CodeEditor file={activeFile} key={activeFile._id} />
-        ) : (
-          <div className="flex items-center justify-center h-full bg-background">
-            <div className="text-center p-4">
-              <h3 className="text-lg font-medium text-foreground">
-                Welcome to CodeVerse
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Select a file from the explorer to start editing or create a new one.
-              </p>
-            </div>
-          </div>
-        )}
+        <CodeEditor file={activeFile} key={activeFile._id} />
       </ResizablePanel>
     </ResizablePanelGroup>
   );
