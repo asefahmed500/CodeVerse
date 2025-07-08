@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useTerminalManager } from "@/hooks/use-terminal-manager-store";
 import { useRouter } from "next/navigation";
+import { IDE_MANUAL } from "@/config/manual";
 
 export default function EditorLayout({
   children,
@@ -35,22 +36,31 @@ export default function EditorLayout({
   useEffect(() => {
     if (isHydrated && useFileSystem.getState().files.length === 0) {
       const { createFile } = useFileSystem.getState();
-      createFile(
-        "welcome.js",
-        undefined,
-        `// Welcome to CodeVerse!
-// Create, edit, and run your code.
-// All files are saved locally in your browser.
+      const setupWorkspace = async () => {
+        const welcomeFile = await createFile(
+          "welcome.ts",
+          undefined,
+          `// Welcome to CodeVerse!
+// This is a fully client-side IDE running in your browser.
 
-function greet() {
-  console.log("Hello, World!");
+// 1. Create, edit, and run your code.
+// 2. All files are saved locally in your browser's storage.
+// 3. Clone public GitHub repos from the Source Control panel.
+
+function greet(name: string): void {
+  console.log(\`Hello, \${name}!\`);
 }
 
-greet();
+greet("Developer");
 `
-      ).then(newFile => {
-        if(newFile) router.replace(`/editor/${newFile._id}`);
-      });
+        );
+        await createFile("IDE_MANUAL.txt", undefined, IDE_MANUAL);
+
+        if(welcomeFile) {
+          router.replace(`/editor/${welcomeFile._id}`);
+        }
+      };
+      setupWorkspace();
     }
   }, [isHydrated, router]);
 

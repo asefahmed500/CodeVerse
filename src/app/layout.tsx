@@ -4,7 +4,7 @@ import { Providers } from '@/components/providers';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
-  title: 'Aethermind IDE',
+  title: 'CodeVerse',
   description: 'Online VS Code Clone built with Next.js',
 };
 

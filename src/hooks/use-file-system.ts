@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { getLanguageConfigFromFilename } from '@/config/languages';
 import { produce } from 'immer';
 
-// Helper to get a flattened list of all files
 const getFlatFiles = (files: FileType[]): FileType[] => {
     const allFiles: FileType[] = [];
     const recursion = (fs: FileType[]) => {
@@ -21,7 +20,6 @@ const getFlatFiles = (files: FileType[]): FileType[] => {
     return allFiles;
 }
 
-// Find a node and its parent in the tree
 const findNodeWithParent = (files: FileType[], fileId: string): { node: FileType | null, parent: FileType | null, collection: FileType[] } => {
     const find = (collection: FileType[], parent: FileType | null): { node: FileType | null, parent: FileType | null, collection: FileType[] } => {
         for (const file of collection) {
@@ -40,10 +38,10 @@ interface FileSystemState {
   files: FileType[];
   activeFileId: string | null;
   expandedFolders: string[];
-  allFiles: FileType[]; // Derived state, kept for quick lookups
-  activeFile: FileType | null; // Derived state for convenience
+  allFiles: FileType[];
+  activeFile: FileType | null;
+  loading: boolean;
   
-  // Actions
   _setFiles: (files: FileType[]) => void;
   findFile: (fileId: string) => FileType | null;
   getPathForFile: (fileId: string) => string;
@@ -51,6 +49,7 @@ interface FileSystemState {
   createFolder: (name: string, parentId?: string) => Promise<FileType | null>;
   updateFile: (fileId: string, updates: Partial<FileType>, options?: { optimistic?: boolean, noUpdate?: boolean }) => Promise<void>;
   deleteFile: (fileId: string) => Promise<void>;
+  duplicateFileOrFolder: (fileId: string) => Promise<void>;
   setActiveFileId: (fileId: string | null) => void;
   toggleFolder: (folderId: string) => void;
   searchFiles: (query: string) => Promise<SearchResult[]>;
@@ -67,12 +66,13 @@ const useFileSystemStore = create<FileSystemState>()(
       expandedFolders: [],
       allFiles: [],
       activeFile: null,
+      loading: false,
 
       _setFiles: (files: FileType[]) => {
         const allFiles = getFlatFiles(files);
         const activeFileId = get().activeFileId;
         const activeFile = allFiles.find(f => f._id === activeFileId) || null;
-        set({ files, allFiles, activeFile });
+        set({ files, allFiles, activeFile, loading: false });
       },
 
       findFile: (fileId: string) => {
@@ -81,45 +81,33 @@ const useFileSystemStore = create<FileSystemState>()(
       },
       
       getPathForFile: (fileId: string): string => {
-        const allFiles = get().allFiles;
-        if (allFiles.length === 0) return '';
-        const fileMap = new Map(allFiles.map(f => [f._id, f]));
+        const fileMap = new Map(get().allFiles.map(f => [f._id, f]));
+        const startFile = fileMap.get(fileId);
+        if (!startFile) return '';
         
-        const file = fileMap.get(fileId);
-        if (!file) return '';
-
-        const pathParts: string[] = [file.name];
-        let currentParentId = file.parentId;
-
+        const pathParts: string[] = [startFile.name];
+        let currentParentId = startFile.parentId;
+        
         while (currentParentId) {
-          const parent = fileMap.get(currentParentId);
-          if (parent) {
-            pathParts.unshift(parent.name);
-            currentParentId = parent.parentId;
-          } else {
-            // Orphan file, stop building path
-            break;
-          }
+            const parent = fileMap.get(currentParentId);
+            if (parent) {
+                pathParts.unshift(parent.name);
+                currentParentId = parent.parentId;
+            } else {
+                break;
+            }
         }
         return `/${pathParts.join('/')}`;
       },
 
       createFile: async (name: string, parentId?: string, content: string = '') => {
         const newFile: FileType = {
-          _id: uuidv4(),
-          name,
-          content,
-          isFolder: false,
-          parentId: parentId || null,
+          _id: uuidv4(), name, content, isFolder: false, parentId: parentId || null,
           language: getLanguageConfigFromFilename(name).monacoLanguage,
-          isOpen: true,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          isOpen: true, isActive: true, createdAt: new Date(), updatedAt: new Date(),
         };
 
         const files = produce(get().files, draft => {
-            getFlatFiles(draft).forEach(f => f.isActive = false); // Deactivate all other files
             if (parentId) {
                 const parent = getFlatFiles(draft).find(f => f._id === parentId && f.isFolder);
                 if (parent) {
@@ -139,17 +127,9 @@ const useFileSystemStore = create<FileSystemState>()(
 
       createFolder: async (name: string, parentId?: string) => {
         const newFolder: FileType = {
-          _id: uuidv4(),
-          name,
-          content: '',
-          isFolder: true,
-          parentId: parentId || null,
-          language: 'plaintext',
-          isOpen: false,
-          isActive: false,
-          children: [],
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          _id: uuidv4(), name, content: '', isFolder: true, parentId: parentId || null,
+          language: 'plaintext', isOpen: false, isActive: false, children: [],
+          createdAt: new Date(), updatedAt: new Date(),
         };
 
          const files = produce(get().files, draft => {
@@ -177,21 +157,11 @@ const useFileSystemStore = create<FileSystemState>()(
             const file = getFlatFiles(draft).find(f => f._id === fileId);
             if (file) {
                 Object.assign(file, updates, { updatedAt: new Date() });
-                
-                if (updates.isActive) {
-                    getFlatFiles(draft).forEach(f => {
-                        if (f._id !== fileId) f.isActive = false;
-                    });
-                }
             }
         });
         
-        if (!options.noUpdate) {
-            get()._setFiles(files);
-        } else {
-          // For optimistic updates that don't trigger a full recalculation immediately
-          set({ files });
-        }
+        if (!options.noUpdate) get()._setFiles(files);
+        else set({ files });
       },
 
       deleteFile: async (fileId: string) => {
@@ -199,68 +169,94 @@ const useFileSystemStore = create<FileSystemState>()(
         if (!fileToDelete) return;
 
         const files = produce(get().files, draft => {
-            const { parent, collection, node } = findNodeWithParent(draft, fileId);
-            if (node) {
-                const index = collection.findIndex(f => f._id === fileId);
-                if (index > -1) {
-                    collection.splice(index, 1);
-                }
-            }
+            const { collection } = findNodeWithParent(draft, fileId);
+            const index = collection.findIndex(f => f._id === fileId);
+            if (index > -1) collection.splice(index, 1);
         });
 
         get()._setFiles(files);
-        if (get().activeFileId === fileId) {
-            get().setActiveFileId(null);
-        }
+        if (get().activeFileId === fileId) get().setActiveFileId(null);
         toast.success(`Deleted ${fileToDelete.name}.`);
+      },
+
+      duplicateFileOrFolder: async (fileId: string) => {
+        const originalNode = get().findFile(fileId);
+        if (!originalNode) return;
+    
+        const duplicateRecursively = (node: FileType, parentId: string | null): FileType => {
+          const newId = uuidv4();
+          const newNode: FileType = { ...node, _id: newId, parentId, createdAt: new Date(), updatedAt: new Date() };
+          if (node.isFolder && node.children) {
+            newNode.children = node.children.map(child => duplicateRecursively(child, newId));
+          }
+          return newNode;
+        };
+    
+        const files = produce(get().files, draft => {
+          const { collection, node } = findNodeWithParent(draft, fileId);
+          if (node) {
+            const duplicatedNode = duplicateRecursively(node, node.parentId);
+            let newName = node.name;
+            const extIndex = newName.lastIndexOf('.');
+            const baseName = extIndex !== -1 ? newName.substring(0, extIndex) : newName;
+            const extension = extIndex !== -1 ? newName.substring(extIndex) : '';
+            
+            let counter = 1;
+            do {
+              newName = `${baseName} copy${counter > 1 ? ` ${counter}` : ''}${extension}`;
+              counter++;
+            } while (collection.some(f => f.name === newName));
+    
+            duplicatedNode.name = newName;
+            collection.push(duplicatedNode);
+          }
+        });
+    
+        get()._setFiles(files);
+        toast.success(`Duplicated "${originalNode.name}"`);
       },
       
       setActiveFileId: (fileId: string | null) => {
         if (get().activeFileId === fileId) return;
-        set({ activeFileId: fileId });
 
         const files = produce(get().files, draft => {
           getFlatFiles(draft).forEach(f => {
             f.isActive = f._id === fileId;
           });
         });
+        // Set activeFileId first, then call _setFiles to update derived state
+        set({ activeFileId: fileId });
         get()._setFiles(files);
       },
 
       toggleFolder: (folderId: string) => {
-        set(state => {
-            const newSet = new Set(state.expandedFolders);
-            if (newSet.has(folderId)) newSet.delete(folderId);
-            else newSet.add(folderId);
-            return { expandedFolders: Array.from(newSet) };
-        });
+        set(produce(state => {
+            const index = state.expandedFolders.indexOf(folderId);
+            if (index > -1) state.expandedFolders.splice(index, 1);
+            else state.expandedFolders.push(folderId);
+        }));
       },
 
       searchFiles: async (query: string): Promise<SearchResult[]> => {
           if (!query) return [];
           const allFiles = get().allFiles;
           const results: SearchResult[] = [];
-
           try {
             const regex = new RegExp(query, 'gi');
-  
             for (const file of allFiles) {
-                if (file.isFolder) continue;
-  
-                const contentMatches: SearchMatch[] = [];
-                if (file.content) {
+                if (file.isFolder || !file.content) continue;
+                const matches = [...file.content.matchAll(regex)];
+                if (matches.length > 0) {
+                    const lineMatches = new Map<number, SearchMatch>();
                     const lines = file.content.split('\n');
-                    lines.forEach((line, index) => {
-                        if (regex.test(line)) {
-                            contentMatches.push({ lineNumber: index + 1, lineContent: line });
+                    for (const match of matches) {
+                        if (match.index === undefined) continue;
+                        let lineNum = (file.content.substring(0, match.index).match(/\n/g) || []).length;
+                        if (!lineMatches.has(lineNum)) {
+                            lineMatches.set(lineNum, { lineNumber: lineNum + 1, lineContent: lines[lineNum] });
                         }
-                    });
-                }
-  
-                // Reset regex state for the next test
-                regex.lastIndex = 0;
-                if (regex.test(file.name) || contentMatches.length > 0) {
-                    results.push({ file, matches: contentMatches });
+                    }
+                    results.push({ file, matches: Array.from(lineMatches.values()) });
                 }
             }
           } catch (e) {
@@ -273,90 +269,71 @@ const useFileSystemStore = create<FileSystemState>()(
       replaceInFiles: async (query: string, replaceWith: string) => {
         try {
           const regex = new RegExp(query, 'g');
-          const filesToUpdate = get().allFiles.filter(f => !f.isFolder && f.content && regex.test(f.content));
-          regex.lastIndex = 0; // Reset
-          
+          const filesWithMatches = get().allFiles.filter(f => !f.isFolder && f.content && new RegExp(query, 'g').test(f.content));
+          if (filesWithMatches.length === 0) {
+            toast.info("No occurrences found to replace.");
+            return;
+          }
+
           let totalReplacements = 0;
           const files = produce(get().files, draft => {
-              filesToUpdate.forEach(fileData => {
+              filesWithMatches.forEach(fileData => {
                   const liveFile = getFlatFiles(draft).find(f => f._id === fileData._id);
-                  if (liveFile) {
+                  if (liveFile && liveFile.content) {
                     const originalContent = liveFile.content;
-                    const replacementCount = (originalContent.match(regex) || []).length;
-                    if(replacementCount > 0){
-                        liveFile.content = originalContent.replace(regex, replaceWith);
-                        totalReplacements += replacementCount;
-                    }
+                    const newContent = originalContent.replace(regex, replaceWith);
+                    totalReplacements += (originalContent.match(regex) || []).length;
+                    liveFile.content = newContent;
                   }
-              })
+              });
           });
   
           get()._setFiles(files);
-          if (totalReplacements > 0) {
-              toast.success(`Replaced ${totalReplacements} instance(s) in ${filesToUpdate.length} file(s).`);
-          } else {
-              toast.info("No occurrences found to replace.");
-          }
+          toast.success(`Replaced ${totalReplacements} instance(s) in ${filesWithMatches.length} file(s).`);
         } catch (e) {
           toast.error("Invalid regular expression in search query.");
         }
       },
       
       setWorkspaceFromGitHub: async (owner: string, repo: string) => {
+        set({ loading: true });
         const toastId = toast.loading(`Cloning ${owner}/${repo}...`);
         try {
             const res = await fetch(`/api/github?action=getRepoTree&owner=${owner}&repo=${repo}`);
             const ghItems: { path: string; content?: string; type: 'file' | 'dir' }[] = await res.json();
 
-            if (!res.ok) {
-              throw new Error((ghItems as any).error || "Failed to clone repository.");
-            }
-
+            if (!res.ok) throw new Error((ghItems as any).error || "Failed to clone repository.");
             if (ghItems.length === 0) {
               toast.warning("Repository is empty or contains no supported text files.");
-              toast.dismiss(toastId);
               return;
             }
             
             const newFileTree: FileType[] = [];
             const dirMap = new Map<string, FileType>();
-
-            // Sort by path string to ensure directories are created before files inside them
             ghItems.sort((a, b) => a.path.localeCompare(b.path));
 
-            for (const itemData of ghItems) {
-                const parts = itemData.path.split('/');
+            for (const item of ghItems) {
+                const parts = item.path.split('/');
                 const itemName = parts.pop()!;
-                const dirPath = parts.join('/');
-                
-                const parent = dirPath ? dirMap.get(dirPath) : null;
+                const parentPath = parts.join('/');
+                const parent = parentPath ? dirMap.get(parentPath) : null;
 
                 const newItem: FileType = {
-                  _id: uuidv4(),
-                  name: itemName,
-                  content: itemData.type === 'file' ? itemData.content || '' : '',
-                  isFolder: itemData.type === 'dir',
-                  parentId: parent ? parent._id : null,
-                  language: itemData.type === 'file' ? getLanguageConfigFromFilename(itemName).monacoLanguage : 'plaintext',
-                  isOpen: false,
-                  isActive: false,
-                  children: itemData.type === 'dir' ? [] : undefined,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  _id: uuidv4(), name: itemName, parentId: parent?._id || null,
+                  content: item.type === 'file' ? item.content || '' : '',
+                  isFolder: item.type === 'dir',
+                  language: item.type === 'file' ? getLanguageConfigFromFilename(itemName).monacoLanguage : 'plaintext',
+                  children: item.type === 'dir' ? [] : undefined,
+                  isOpen: false, isActive: false, createdAt: new Date(), updatedAt: new Date(),
                 };
 
-                if (newItem.isFolder) {
-                  dirMap.set(itemData.path, newItem);
-                }
+                if (newItem.isFolder) dirMap.set(item.path, newItem);
 
-                if (parent) {
-                  parent.children?.push(newItem);
-                } else {
-                  newFileTree.push(newItem);
-                }
+                if (parent) parent.children?.push(newItem);
+                else newFileTree.push(newItem);
             }
             
-            get().reset(); // Clear existing workspace
+            get().reset();
             get()._setFiles(newFileTree);
 
             const firstFile = get().allFiles.find(f => !f.isFolder);
@@ -367,16 +344,21 @@ const useFileSystemStore = create<FileSystemState>()(
             toast.success(`Cloned ${repo} successfully.`, { id: toastId });
         } catch (error: any) {
             toast.error(error.message, { id: toastId });
+        } finally {
+            set({ loading: false });
         }
       },
       
       reset: () => {
-        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [], activeFile: null });
+        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [], activeFile: null, loading: false });
       }
     }),
     {
-      name: 'codeverse-file-system-local-v4', 
-      storage: createJSONStorage(() => localStorage), 
+      name: 'codeverse-file-system-v5', 
+      storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state) state.loading = false;
+      }
     }
   )
 );

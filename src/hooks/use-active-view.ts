@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-export type ActiveView = "explorer" | "search" | "github" | "terminal" | "settings" | null;
+export type ActiveView = "explorer" | "search" | "github" | "terminal" | "settings" | "debug" | null;
 
 interface ActiveViewState {
   activeView: ActiveView;

@@ -5,6 +5,7 @@ import { Explorer } from "./explorer";
 import { SearchView } from "./search-view";
 import { GitHubView } from "./github-view";
 import { SettingsView } from "./settings-view";
+import { DebugView } from "./debug-view";
 import {
   Select,
   SelectContent,
@@ -41,6 +42,7 @@ export function SidebarView() {
         {activeView === 'explorer' && <Explorer />}
         {activeView === 'search' && <SearchView />}
         {activeView === 'github' && <GitHubView />}
+        {activeView === 'debug' && <DebugView />}
         {activeView === 'settings' && <SettingsView />}
       </div>
     </div>

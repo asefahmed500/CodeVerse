@@ -44,6 +44,13 @@ export function KeyboardShortcuts() {
         toggleCommandPalette();
         return;
       }
+
+      // Toggle Debug View
+      if (isCtrlCmd && e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        setActiveView('debug');
+        return;
+      }
       
       // Open Settings
       if (isCtrlCmd && e.key === ",") {

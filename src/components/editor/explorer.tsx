@@ -1,7 +1,6 @@
-
 "use client";
 
-import { ChevronRight, FolderPlus, FilePlus, RefreshCw, X, Pencil } from "lucide-react";
+import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil } from "lucide-react";
 import React, { useState } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useRouter } from "next/navigation";
@@ -57,7 +56,7 @@ export function Explorer() {
 }
 
 function FileTree() {
-  const { files, loading, expandedFolders, toggleFolder } = useFileSystem();
+  const { files, loading, expandedFolders } = useFileSystem();
 
   const renderFile = (file: FileType, depth: number) => (
     <FileTreeItem
@@ -74,7 +73,7 @@ function FileTree() {
       <Collapsible defaultOpen>
         <CollapsibleTrigger className="flex items-center p-1 font-bold text-sm uppercase w-full">
             <ChevronRight size={16} className="transform transition-transform duration-200 data-[state=open]:rotate-90"/>
-            <span className="ml-1">AETHERMIND WORKSPACE</span>
+            <span className="ml-1">CODEVERSE WORKSPACE</span>
         </CollapsibleTrigger>
         <CollapsibleContent>
             {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}
@@ -94,7 +93,7 @@ function FileTreeItem({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { activeFileId, setActiveFileId, toggleFolder, expandedFolders, deleteFile, updateFile, createFile, createFolder } = useFileSystem();
+  const { activeFileId, setActiveFileId, toggleFolder, expandedFolders, deleteFile, updateFile, createFile, createFolder, duplicateFileOrFolder } = useFileSystem();
   const [isEditing, setIsEditing] = useState(false);
   const [editingValue, setEditingValue] = useState(file.name);
 
@@ -128,6 +127,11 @@ function FileTreeItem({
     toast.success(`Renamed to ${editingValue}`);
     setIsEditing(false);
   };
+
+  const handleDuplicate = async (e: Event) => {
+    e.preventDefault();
+    await duplicateFileOrFolder(file._id);
+  }
   
   const handleNewFile = async (e: Event) => {
     e.preventDefault();
@@ -215,6 +219,10 @@ function FileTreeItem({
           <DropdownMenuItem onSelect={handleRenameClick}>
             <Pencil className="mr-2 h-4 w-4" />
             <span>Rename</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleDuplicate}>
+            <Copy className="mr-2 h-4 w-4" />
+            <span>Duplicate</span>
           </DropdownMenuItem>
           <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={handleDelete}>
             <X className="mr-2 h-4 w-4" />
