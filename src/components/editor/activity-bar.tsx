@@ -1,7 +1,6 @@
 "use client";
 
 import { User, Settings } from "lucide-react";
-import { signIn, signOut, useSession } from 'next-auth/react';
 import { Button } from "@/components/ui/button";
 import { useActiveView } from "@/hooks/use-active-view";
 import {
@@ -10,12 +9,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { activityItems, settingsItem } from "@/config/views";
+import { activityItems } from "@/config/views";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 
 export function ActivityBar() {
   const { activeView, setActiveView } = useActiveView();
-  const { data: session } = useSession();
 
   return (
     <TooltipProvider>
@@ -41,21 +39,14 @@ export function ActivityBar() {
         <div className="flex flex-col items-center gap-2">
             <Tooltip>
                 <TooltipTrigger asChild>
-                {session?.user ? (
-                    <Button onClick={() => signOut()} variant="ghost" size="icon" className="w-10 h-10 rounded-lg">
+                    <Button variant="ghost" size="icon" className="w-10 h-10 rounded-lg">
                         <Avatar className="h-8 w-8">
-                            <AvatarImage src={session.user.image!} alt={session.user.name!} />
-                            <AvatarFallback>{session.user.name?.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>U</AvatarFallback>
                         </Avatar>
                     </Button>
-                ) : (
-                    <Button onClick={() => signIn('github')} variant="ghost" size="icon" className="w-10 h-10 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground">
-                        <User className="h-6 w-6" />
-                    </Button>
-                )}
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                {session?.user ? `Sign out ${session.user.name}` : 'Sign in'}
+                    User Account
                 </TooltipContent>
             </Tooltip>
             <Tooltip>

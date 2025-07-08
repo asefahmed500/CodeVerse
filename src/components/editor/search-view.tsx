@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { X, ChevronRight, Loader2, ReplaceAll } from 'lucide-react'
-import { useDebounce } from 'use-debounce'
+import { X, ChevronRight, ReplaceAll } from 'lucide-react'
+import { useDebounceCallback } from 'use-debounce'
 import { useRouter } from 'next/navigation'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { toast } from 'sonner'
@@ -50,74 +50,31 @@ export function SearchView() {
   const [query, setQuery] = useState('')
   const [replaceQuery, setReplaceQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [isReplacing, setIsReplacing] = useState(false)
   const [showReplace, setShowReplace] = useState(false)
-  const [debouncedQuery] = useDebounce(query, 500)
   const router = useRouter()
-  const { refreshFiles } = useFileSystem()
+  const { searchFiles, replaceInFiles } = useFileSystem()
   const { activeView } = useActiveView();
 
-  const searchFiles = useCallback(async (searchQuery: string) => {
-    if (!searchQuery) {
-        setResults([])
-        return;
-    }
-    setIsSearching(true)
-    try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery })
-      })
-      
-      if (!response.ok) throw new Error('Search failed')
-      
-      const data = await response.json()
-      setResults(data.results || [])
-    } catch (error) {
-      toast.error('Search request failed.')
-    } finally {
-      setIsSearching(false)
-    }
-  }, []);
+  const debouncedSearch = useDebounceCallback((searchQuery: string) => {
+    setResults(searchFiles(searchQuery));
+  }, 500);
 
-
-  useEffect(() => {
-    searchFiles(debouncedQuery)
-  }, [debouncedQuery, searchFiles])
+  const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    debouncedSearch(newQuery);
+  }
   
-  const handleReplaceAll = async () => {
-    if (!debouncedQuery || results.length === 0 || isReplacing) return;
-    setIsReplacing(true);
-    try {
-      const res = await fetch('/api/replace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: debouncedQuery, replaceWith: replaceQuery })
-      });
-
-      if (!res.ok) {
-        const { error } = await res.json();
-        throw new Error(error || 'Replace operation failed.');
-      }
-
-      const { filesUpdated, replacements } = await res.json();
-      if (filesUpdated > 0) {
-        toast.success(`Replaced ${replacements} instance(s) in ${filesUpdated} file(s).`);
-      } else {
-        toast.info("No occurrences found to replace.");
-      }
-      
-      setQuery('');
-      setResults([]);
-      await refreshFiles();
-
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setIsReplacing(false);
+  const handleReplaceAll = () => {
+    if (!query || results.length === 0) return;
+    const { filesUpdated, replacements } = replaceInFiles(query, replaceQuery);
+    if (filesUpdated > 0) {
+      toast.success(`Replaced ${replacements} instance(s) in ${filesUpdated} file(s).`);
+    } else {
+      toast.info("No occurrences found to replace.");
     }
+    setQuery('');
+    setResults([]);
   };
 
 
@@ -154,7 +111,7 @@ export function SearchView() {
                 <Input
                   placeholder="Search"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={handleQueryChange}
                   className="h-8 pr-8"
                   autoFocus
                 />
@@ -163,7 +120,7 @@ export function SearchView() {
                     variant="ghost"
                     size="icon"
                     className="absolute right-0 top-0 h-8 w-8 text-muted-foreground hover:bg-accent"
-                    onClick={() => setQuery('')}
+                    onClick={() => { setQuery(''); setResults([]); }}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -183,16 +140,10 @@ export function SearchView() {
                         variant="ghost"
                         size="icon"
                         className="absolute right-0 top-0 h-8 w-8 text-muted-foreground hover:bg-accent"
-                        disabled={
-                          !query || isReplacing || results.length === 0
-                        }
+                        disabled={!query || results.length === 0}
                         onClick={handleReplaceAll}
                       >
-                        {isReplacing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <ReplaceAll className="h-4 w-4" />
-                        )}
+                        <ReplaceAll className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -205,12 +156,9 @@ export function SearchView() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {isSearching ? (
-            <div className="p-4 text-center text-sm">Searching...</div>
-          ) : (
             <div className="p-2">
               <p className="text-xs text-muted-foreground mb-2">
-                  {results.length > 0 ? `${results.length} results in ${new Set(results.map(r => r.file._id)).size} files` : 'No results found.'}
+                  {results.length > 0 ? `${results.length} results in ${new Set(results.map(r => r.file._id)).size} files` : (query ? 'No results found.' : '')}
               </p>
               <Accordion type="multiple" className="w-full">
                 {results.map(({ file, matches }) => (
@@ -241,7 +189,6 @@ export function SearchView() {
                 ))}
               </Accordion>
             </div>
-          )}
         </div>
       </div>
     </TooltipProvider>

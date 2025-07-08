@@ -51,7 +51,10 @@ export function CommandPalette() {
 
               <CommandPrimitive.Group heading="General" className="text-muted-foreground pt-2">
                 <CommandPrimitive.Item 
-                  onSelect={() => runCommand(() => createFile('Untitled'))}
+                  onSelect={() => runCommand(() => {
+                    const newFile = createFile('Untitled.js');
+                    if(newFile) router.push(`/editor/${newFile._id}`);
+                  })}
                   className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground"
                 >
                   <FilePlus className="w-4 h-4 mr-2" />

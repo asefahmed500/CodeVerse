@@ -1,7 +1,7 @@
 "use client";
 
 import Editor, { OnChange, type OnMount } from "@monaco-editor/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -14,45 +14,33 @@ import { useEditorSettingsStore } from "@/hooks/use-editor-settings-store";
 
 export function CodeEditor({ file }: { file: FileType }) {
   const { theme } = useTheme();
-  const [content, setContent] = useState(file.content);
   const { updateFile } = useFileSystem();
   const { setEditor, setSaveHandler, setCursorPosition } = useEditorStore();
   const { fontSize, tabSize, wordWrap, minimap } = useEditorSettingsStore();
 
-  useEffect(() => {
-    setContent(file.content);
-  }, [file.content]);
-
-  const immediateSave = useCallback(async (currentContent: string) => {
-    try {
-      await updateFile(file._id, { content: currentContent });
-      toast.success(`${file.name} saved.`);
-    } catch (error) {
-      toast.error(`Failed to save ${file.name}`);
-    }
+  const immediateSave = useCallback((currentContent: string) => {
+    updateFile(file._id, { content: currentContent });
+    toast.success(`${file.name} saved.`);
   }, [file._id, file.name, updateFile]);
   
   const debouncedSave = useCallback(debounce(immediateSave, 2000), [immediateSave]);
 
   const handleEditorChange: OnChange = (value) => {
     const newContent = value || "";
-    setContent(newContent);
+    // Optimistically update the file in the store to avoid re-renders
+    file.content = newContent;
     debouncedSave(newContent);
   };
   
+  // Effect to set up the manual save handler
   useEffect(() => {
-    setSaveHandler(() => () => immediateSave(content));
-    return () => {
-      setSaveHandler(null);
+    const handler = () => {
+      // Use the most recent content from the file object
+      immediateSave(file.content);
     };
-  }, [immediateSave, content, setSaveHandler]);
-
-  useEffect(() => {
-    return () => {
-      setEditor(null);
-      setCursorPosition(null);
-    };
-  }, [setEditor, setCursorPosition]);
+    setSaveHandler(() => handler);
+    return () => setSaveHandler(null);
+  }, [immediateSave, file.content, setSaveHandler]);
 
   const handleEditorMount: OnMount = (editor) => {
     setEditor(editor);
@@ -91,10 +79,11 @@ export function CodeEditor({ file }: { file: FileType }) {
           path={file.name}
           defaultLanguage={languageConfig.monacoLanguage}
           theme={theme === "dark" ? "vs-dark" : "light"}
-          value={content}
+          defaultValue={file.content}
           onChange={handleEditorChange}
           options={editorOptions}
           onMount={handleEditorMount}
+          key={file._id}
         />
       </div>
     </div>

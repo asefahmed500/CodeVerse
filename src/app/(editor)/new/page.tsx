@@ -12,12 +12,11 @@ export default function NewFilePage() {
     if (loading) return;
 
     const createNewUntitledFile = async () => {
-      // The createFile hook now handles unique name generation and routing.
-      const newFile = await createFile("Untitled");
-      // If file creation fails, the hook shows a toast. We should redirect
-      // the user back to the editor home to avoid being stuck on the "Creating..." page.
-      if (!newFile) {
-        router.replace("/editor");
+      const newFile = createFile("Untitled.js");
+      if (newFile) {
+        router.replace(`/editor/${newFile._id}`);
+      } else {
+        router.replace('/editor');
       }
     };
 

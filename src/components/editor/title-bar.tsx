@@ -4,7 +4,6 @@ import { Play, Menu } from 'lucide-react';
 import { useFileSystem } from '@/hooks/use-file-system';
 import { useTerminalStore } from '@/hooks/use-terminal-store';
 import { useActiveView } from '@/hooks/use-active-view';
-import type { Session } from 'next-auth';
 import { CommandPalette } from './command-palette';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -12,11 +11,13 @@ import { getLanguageConfigFromFilename } from '@/config/languages';
 import { useMobileSidebar } from '@/hooks/use-mobile-sidebar';
 import { MainMenuBar } from './main-menu-bar';
 
-export function TitleBar({ session }: { session: Session | null }) {
-  const { activeFile, getPathForFile } = useFileSystem();
+export function TitleBar() {
+  const { activeFileId, findFile, getPathForFile } = useFileSystem();
   const { runCommand } = useTerminalStore();
   const { openView } = useActiveView();
   const { toggle: toggleMobileSidebar } = useMobileSidebar();
+  
+  const activeFile = findFile(activeFileId || '');
 
   const title = activeFile
     ? `${activeFile.name} - CodeVerse`

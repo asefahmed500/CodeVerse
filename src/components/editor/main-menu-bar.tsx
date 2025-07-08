@@ -16,13 +16,24 @@ import { useActiveView } from "@/hooks/use-active-view";
 import { useTerminalStore } from "@/hooks/use-terminal-store";
 import { getLanguageConfigFromFilename } from "@/config/languages";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export function MainMenuBar() {
-  const { createFile, createFolder, activeFile, getPathForFile } = useFileSystem();
+  const { createFile, createFolder, activeFileId, findFile, getPathForFile } = useFileSystem();
   const { editor, triggerSave, triggerCommand } = useEditorStore();
   const { setOpen: setCommandPaletteOpen } = useCommandPaletteStore();
   const { setActiveView, openView } = useActiveView();
   const { runCommand } = useTerminalStore();
+  const router = useRouter();
+
+  const activeFile = findFile(activeFileId || '');
+
+  const handleNewFile = () => {
+    const newFile = createFile('Untitled.js');
+    if (newFile) {
+        router.push(`/editor/${newFile._id}`);
+    }
+  }
 
   const handleRun = () => {
     if (!activeFile || activeFile.isFolder) return;
@@ -49,7 +60,7 @@ export function MainMenuBar() {
       <MenubarMenu>
         <MenubarTrigger className="h-full px-2">File</MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onSelect={() => createFile('Untitled')}>New File</MenubarItem>
+          <MenubarItem onSelect={handleNewFile}>New File</MenubarItem>
           <MenubarItem onSelect={() => createFolder('New Folder')}>New Folder</MenubarItem>
           <MenubarSeparator />
           <MenubarItem onSelect={triggerSave} disabled={!activeFile || activeFile.isFolder}>

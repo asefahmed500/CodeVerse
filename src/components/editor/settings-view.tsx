@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useTheme } from 'next-themes'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -9,10 +10,27 @@ import { useActiveView } from '@/hooks/use-active-view'
 import { useEditorSettingsStore } from '@/hooks/use-editor-settings-store'
 import { Label } from '../ui/label'
 import { toast } from 'sonner'
+import { useFileSystem } from '@/hooks/use-file-system'
+import { useTerminalManager } from '@/hooks/use-terminal-manager-store'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme()
   const { activeView } = useActiveView()
+  const { reset: resetFileSystem } = useFileSystem()
+  const { reset: resetTerminals } = useTerminalManager()
+  const [isResetAlertOpen, setResetAlertOpen] = useState(false);
+
   const {
     fontSize, setFontSize,
     tabSize, setTabSize,
@@ -33,11 +51,20 @@ export function SettingsView() {
     setVimMode(enabled);
   }
 
+  const handleResetWorkspace = () => {
+    resetFileSystem();
+    resetTerminals();
+    setResetAlertOpen(false);
+    toast.success("Workspace has been reset.");
+    // Optional: reload to ensure a clean state
+    setTimeout(() => window.location.reload(), 500);
+  }
+
   return (
     <div className="h-full flex flex-col bg-card text-card-foreground">
        <div className="p-2 border-b border-border flex items-center justify-between">
         <h3 className="font-bold text-sm uppercase">Settings</h3>
-        <Button variant="ghost" size="sm" onClick={resetSettings}>Reset All</Button>
+        <Button variant="ghost" size="sm" onClick={resetSettings}>Reset Editor Settings</Button>
       </div>
       <div className="p-4 space-y-8 flex-1 overflow-y-auto">
         
@@ -105,14 +132,31 @@ export function SettingsView() {
         </div>
 
         <div className='space-y-4'>
-            <h3 className="text-sm font-medium text-muted-foreground">Keybindings</h3>
-            <div className='flex items-center justify-between'>
-                <Label htmlFor="vim-mode-switch" className='text-sm'>Vim Mode</Label>
-                <Switch 
-                    id="vim-mode-switch"
-                    checked={vimMode}
-                    onCheckedChange={handleVimModeChange}
-                />
+            <h3 className="text-sm font-medium text-muted-foreground">Workspace</h3>
+             <div className='flex items-center justify-between'>
+                <div className='flex flex-col space-y-1'>
+                    <Label htmlFor="reset-workspace" className='text-sm'>Reset Workspace</Label>
+                    <p className='text-xs text-muted-foreground'>This will delete all your files and terminals. This action cannot be undone.</p>
+                </div>
+                <AlertDialog open={isResetAlertOpen} onOpenChange={setResetAlertOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button id="reset-workspace" variant="destructive">Reset</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete your entire workspace, including all files, folders, and terminal history. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleResetWorkspace}>
+                        Yes, reset workspace
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
       </div>

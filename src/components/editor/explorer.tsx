@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, ChevronDown, FolderPlus, FilePlus, RefreshCw, X, Pencil } from "lucide-react";
+import { ChevronRight, FolderPlus, FilePlus, RefreshCw, X, Pencil } from "lucide-react";
 import React, { useState } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useRouter } from "next/navigation";
@@ -17,28 +17,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 
 export function Explorer() {
   const { activeView } = useActiveView();
-  const { createFile, createFolder, refreshFiles, loading } = useFileSystem();
+  const { createFile, createFolder } = useFileSystem();
+  const router = useRouter();
 
   if (activeView !== "explorer") {
     return null;
   }
+  
+  const handleNewFile = () => {
+    const newFile = createFile('Untitled.js');
+    if (newFile) router.push(`/editor/${newFile._id}`);
+  };
+
+  const handleNewFolder = () => {
+    createFolder('New Folder');
+  };
 
   return (
     <div className="h-full flex flex-col bg-card text-card-foreground select-none">
         <div className="p-2 border-b border-border flex items-center justify-between group">
         <h3 className="font-bold text-sm uppercase">Explorer</h3>
         <div className="flex items-center">
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => createFile('Untitled')}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleNewFile}>
             <FilePlus size={16}/>
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => createFolder('New Folder')}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleNewFolder}>
             <FolderPlus size={16}/>
-            </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={refreshFiles}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>
             </Button>
         </div>
         </div>
@@ -48,47 +56,29 @@ export function Explorer() {
 }
 
 function FileTree() {
-  const { files, updateFile, loading, expandedFolders, toggleFolder } = useFileSystem();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState('');
-
-  const handleRename = async (file: FileType) => {
-    if (!editingValue.trim() || editingValue === file.name) {
-        setEditingId(null);
-        return;
-    }
-    try {
-      await updateFile(file._id, { name: editingValue });
-      toast.success(`Renamed to ${editingValue}`);
-    } finally {
-      setEditingId(null);
-    }
-  };
+  const { files, loading, expandedFolders, toggleFolder } = useFileSystem();
 
   const renderFile = (file: FileType, depth: number) => (
     <FileTreeItem
       key={file._id}
       file={file}
       depth={depth}
-      isExpanded={expandedFolders.has(file._id)}
-      onToggleExpand={() => toggleFolder(file._id)}
-      onRename={handleRename}
-      editingId={editingId}
-      setEditingId={setEditingId}
-      editingValue={editingValue}
-      setEditingValue={setEditingValue}
     >
-      {file.isFolder && expandedFolders.has(file._id) && file.children?.map(child => renderFile(child, depth + 1))}
+      {file.isFolder && expandedFolders.includes(file._id) && file.children?.map(child => renderFile(child, depth + 1))}
     </FileTreeItem>
   );
 
   return (
     <div className="flex-1 overflow-y-auto p-1">
-      <div className="flex items-center p-1 font-bold text-sm uppercase">
-          <ChevronDown size={16}/>
-          <span className="ml-1">CodeVerse</span>
-      </div>
-      {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}
+      <Collapsible defaultOpen>
+        <CollapsibleTrigger className="flex items-center p-1 font-bold text-sm uppercase w-full">
+            <ChevronRight size={16} className="transform transition-transform duration-200 data-[state=open]:rotate-90"/>
+            <span className="ml-1">CodeVerse Workspace</span>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+            {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
@@ -96,54 +86,67 @@ function FileTree() {
 function FileTreeItem({
   file,
   depth,
-  isExpanded,
-  onToggleExpand,
   children,
-  onRename,
-  editingId,
-  setEditingId,
-  editingValue,
-  setEditingValue
 }: {
   file: FileType;
   depth: number;
-  isExpanded: boolean;
-  onToggleExpand: (id: string) => void;
   children: React.ReactNode;
-  onRename: (file: FileType) => Promise<void>;
-  editingId: string | null;
-  setEditingId: (id: string | null) => void;
-  editingValue: string;
-  setEditingValue: (value: string) => void;
 }) {
   const router = useRouter();
-  const { setActiveFile, activeFile, deleteFile, createFile, createFolder } = useFileSystem();
+  const { activeFileId, setActiveFileId, toggleFolder, expandedFolders, deleteFile, updateFile, createFile, createFolder } = useFileSystem();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingValue, setEditingValue] = useState(file.name);
 
-  const isEditing = editingId === file._id;
+  const isExpanded = expandedFolders.includes(file._id);
 
   const handleItemClick = (e: React.MouseEvent) => {
-    if (isEditing) return;
-    
     e.stopPropagation();
-    
     if (file.isFolder) {
-      onToggleExpand(file._id);
-      setActiveFile(file);
-    } else {
-      router.push(`/editor/${file._id}`);
+      toggleFolder(file._id);
+    }
+    setActiveFileId(file._id);
+    if (!file.isFolder) {
+        router.push(`/editor/${file._id}`);
     }
   };
   
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setActiveFile(file);
-    // The DropdownMenuTrigger will handle opening the menu.
-    // We manually trigger a click to open it, as an alternative to managing open state.
+    setActiveFileId(file._id);
     const trigger = e.currentTarget.querySelector('[data-context-menu-trigger="true"]');
-    if (trigger instanceof HTMLElement) {
-        trigger.click();
+    if (trigger instanceof HTMLElement) trigger.click();
+  }
+
+  const handleRename = () => {
+    if (!editingValue.trim() || editingValue === file.name) {
+        setIsEditing(false);
+        return;
     }
+    updateFile(file._id, { name: editingValue });
+    toast.success(`Renamed to ${editingValue}`);
+    setIsEditing(false);
+  };
+  
+  const handleNewFile = (e: Event) => {
+    e.preventDefault();
+    const newFile = createFile('Untitled.js', file._id);
+    if(newFile) router.push(`/editor/${newFile._id}`);
+  }
+  
+  const handleNewFolder = (e: Event) => {
+    e.preventDefault();
+    createFolder('New Folder', file._id);
+  }
+
+  const handleDelete = (e: Event) => {
+    e.preventDefault();
+    deleteFile(file._id);
+  }
+
+  const handleRenameClick = (e: Event) => {
+    e.preventDefault();
+    setIsEditing(true);
   }
   
   return (
@@ -153,13 +156,13 @@ function FileTreeItem({
           <div data-context-menu-trigger="true" className="w-full"></div>
       </DropdownMenuTrigger>
       <div
-          className={`flex items-center py-1 px-2 rounded hover:bg-accent cursor-pointer group ${activeFile?._id === file._id ? "bg-muted" : ""}`}
+          className={`flex items-center py-1 px-2 rounded hover:bg-accent cursor-pointer group ${activeFileId === file._id ? "bg-muted" : ""}`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={handleItemClick}
           onContextMenu={handleContextMenu}
         >
           {file.isFolder ? (
-            isExpanded ? <ChevronDown size={16} className="mr-1" /> : <ChevronRight size={16} className="mr-1" />
+            <ChevronRight size={16} className={`mr-1 transition-transform transform ${isExpanded ? 'rotate-90' : ''}`} />
           ) : <div className="w-4 mr-1" />}
           <FileIcon filename={file.name} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
           {isEditing ? (
@@ -167,10 +170,10 @@ function FileTreeItem({
                   type="text"
                   value={editingValue}
                   onChange={(e) => setEditingValue(e.target.value)}
-                  onBlur={() => onRename(file)}
+                  onBlur={handleRename}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') onRename(file);
-                    if (e.key === 'Escape') setEditingId(null);
+                    if (e.key === 'Enter') handleRename();
+                    if (e.key === 'Escape') setIsEditing(false);
                   }}
                   onClick={(e) => e.stopPropagation()}
                   autoFocus
@@ -183,22 +186,22 @@ function FileTreeItem({
       <DropdownMenuContent className="w-48" align="start">
           {file.isFolder && (
             <>
-              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); createFile('Untitled', file._id)}}>
+              <DropdownMenuItem onSelect={handleNewFile}>
                 <FilePlus className="mr-2 h-4 w-4" />
                 <span>New File</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); createFolder('New Folder', file._id)}}>
+              <DropdownMenuItem onSelect={handleNewFolder}>
                 <FolderPlus className="mr-2 h-4 w-4" />
                 <span>New Folder</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setEditingId(file._id); setEditingValue(file.name); }}>
+          <DropdownMenuItem onSelect={handleRenameClick}>
             <Pencil className="mr-2 h-4 w-4" />
             <span>Rename</span>
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => { e.preventDefault(); deleteFile(file._id)}}>
+          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={handleDelete}>
             <X className="mr-2 h-4 w-4" />
             <span>Delete</span>
           </DropdownMenuItem>
