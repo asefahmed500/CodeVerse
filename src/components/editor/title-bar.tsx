@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getLanguageConfigFromFilename } from '@/config/languages';
 import { useMobileSidebar } from '@/hooks/use-mobile-sidebar';
+import { MainMenuBar } from './main-menu-bar';
 
 export function TitleBar({ session }: { session: Session | null }) {
   const { activeFile, getPathForFile } = useFileSystem();
@@ -49,14 +50,7 @@ export function TitleBar({ session }: { session: Session | null }) {
         </svg>
 
         <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">
-            <span>File</span>
-            <span>Edit</span>
-            <span>Selection</span>
-            <span>View</span>
-            <span>Go</span>
-            <span>Run</span>
-            <span>Terminal</span>
-            <span>Help</span>
+            <MainMenuBar />
         </div>
       </div>
       <div className="flex-grow text-center drag-region">

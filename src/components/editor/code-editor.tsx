@@ -5,42 +5,55 @@ import { useCallback, useEffect, useState } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
 import { EDITOR_CONFIG } from "@/config/editor";
 import { getLanguageConfigFromFilename } from "@/config/languages";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { debounce } from "@/lib/utils";
+import { useEditorStore } from "@/hooks/use-editor-store";
 
 export function CodeEditor({ file }: { file: FileType }) {
   const { theme } = useTheme();
   const [content, setContent] = useState(file.content);
-  const [isSaving, setIsSaving] = useState(false);
   const { updateFile } = useFileSystem();
+  const { setEditor, setSaveHandler } = useEditorStore();
 
   useEffect(() => {
     setContent(file.content);
   }, [file.content]);
 
-  const handleSave = useCallback(async (currentContent: string) => {
-    setIsSaving(true);
+  const immediateSave = useCallback(async (currentContent: string) => {
     try {
       await updateFile(file._id, { content: currentContent });
       toast.success(`${file.name} saved.`);
     } catch (error) {
       toast.error(`Failed to save ${file.name}`);
-    } finally {
-      setIsSaving(false);
     }
   }, [file._id, file.name, updateFile]);
-
-  const debouncedSave = useCallback(debounce(handleSave, 2000), [handleSave]);
+  
+  // Debounced save for auto-saving on change
+  const debouncedSave = useCallback(debounce(immediateSave, 2000), [immediateSave]);
 
   const handleEditorChange: OnChange = (value) => {
     const newContent = value || "";
     setContent(newContent);
     debouncedSave(newContent);
   };
+  
+  useEffect(() => {
+    // Register the immediate save function for external triggers (e.g., menu bar)
+    setSaveHandler(() => immediateSave);
+    return () => {
+      setSaveHandler(null);
+    };
+  }, [immediateSave, setSaveHandler]);
+
+  useEffect(() => {
+    // Cleanup editor instance on unmount
+    return () => {
+      setEditor(null);
+    };
+  }, [setEditor]);
+
 
   const languageConfig = getLanguageConfigFromFilename(file.name);
 
@@ -56,10 +69,12 @@ export function CodeEditor({ file }: { file: FileType }) {
           onChange={handleEditorChange}
           options={EDITOR_CONFIG}
           onMount={(editor) => {
+            setEditor(editor); // Register editor instance with the store
             editor.addCommand(
               2097, // Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyS
-              () => handleSave(editor.getValue())
+              () => immediateSave(editor.getValue())
             );
+            editor.focus();
           }}
         />
       </div>

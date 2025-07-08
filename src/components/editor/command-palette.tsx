@@ -1,7 +1,7 @@
 'use client'
 
 import { Command as CommandPrimitive } from 'cmdk'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { File, Search, Settings, GitBranch, TerminalSquare, Github, FolderPlus, FilePlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useFileSystem } from '@/hooks/use-file-system'
@@ -10,9 +10,10 @@ import { useTheme } from 'next-themes'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { FileIcon } from './file-icon'
 import type { FileType } from '@/types'
+import { useCommandPaletteStore } from '@/hooks/use-command-palette-store'
 
 export function CommandPalette() {
-  const [open, setOpen] = useState(false)
+  const { isOpen: open, setOpen, toggle } = useCommandPaletteStore();
   const router = useRouter()
   const { files, createFile, createFolder } = useFileSystem()
   const { setActiveView } = useActiveView()
@@ -22,12 +23,12 @@ export function CommandPalette() {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'p' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        setOpen((open) => !open)
+        toggle();
       }
     }
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
-  }, [])
+  }, [toggle])
 
   const runCommand = (command: () => void) => {
     setOpen(false)
