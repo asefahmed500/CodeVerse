@@ -8,11 +8,9 @@ import { EditorTabs } from "@/components/editor/editor-tabs";
 import { MobileSidebar } from "@/components/editor/mobile-sidebar";
 import { KeyboardShortcuts } from "@/components/editor/keyboard-shortcuts";
 import { CommandPalette } from "@/components/editor/command-palette";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
-import { useTerminalManager } from "@/hooks/use-terminal-manager-store";
-import { useRouter, redirect } from "next/navigation";
-import { IDE_MANUAL } from "@/config/manual";
+import { redirect } from "next/navigation";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -27,9 +25,8 @@ export default function EditorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isHydrated, setIsHydrated] = useState(false);
-  const router = useRouter();
   const { isCollapsed, setCollapsed } = useSidebarStore();
+  const { fetchFiles, loading } = useFileSystem();
   
   const { status } = useSession({
     required: true,
@@ -38,52 +35,18 @@ export default function EditorLayout({
     },
   });
 
-  // Wait for zustand stores to rehydrate
   useEffect(() => {
-    Promise.all([
-      useFileSystem.persist.rehydrate(),
-      useTerminalManager.persist.rehydrate(),
-    ]).then(() => {
-      setIsHydrated(true);
-    });
-  }, []);
-
-  // Initialize with a default file if the store is empty after hydration
-  useEffect(() => {
-    if (isHydrated && useFileSystem.getState().files.length === 0) {
-      const { createFile } = useFileSystem.getState();
-      const setupWorkspace = async () => {
-        const welcomeFile = await createFile(
-          "welcome.ts",
-          undefined,
-          `// Welcome to CodeVerse!
-// This is a fully client-side IDE running in your browser.
-
-// 1. Create, edit, and run your code.
-// 2. All files are saved locally in your browser's storage.
-// 3. Clone public GitHub repos from the Source Control panel.
-
-function greet(name: string): void {
-  console.log(\`Hello, \${name}!\`);
-}
-
-greet("Developer");
-`
-        );
-        await createFile("IDE_MANUAL.txt", undefined, IDE_MANUAL);
-
-        if(welcomeFile) {
-          router.replace(`/editor/${welcomeFile._id}`);
-        }
-      };
-      setupWorkspace();
+    if (status === "authenticated") {
+      fetchFiles();
     }
-  }, [isHydrated, router]);
+  }, [status, fetchFiles]);
 
-  if (status === "loading" || !isHydrated) {
+
+  if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-4 text-lg">Loading Workspace...</p>
       </div>
     );
   }

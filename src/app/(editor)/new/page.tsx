@@ -10,10 +10,14 @@ export default function NewFilePage() {
 
   useEffect(() => {
     const createNewUntitledFile = async () => {
-      const newFile = await createFile("Untitled.js");
+      // This page is called from a command, so we assume a file context
+      // A good default could be the root, or the folder of the currently active file.
+      // For simplicity, we'll create it at the root.
+      const newFile = await createFile("Untitled.js", null);
       if (newFile) {
         router.replace(`/editor/${newFile._id}`);
       } else {
+        // If creation fails (e.g. API error), go back to the editor root.
         router.replace('/editor');
       }
     };

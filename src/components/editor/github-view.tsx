@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Github, FileDiff } from 'lucide-react'
+import { Github } from 'lucide-react'
 import { useSession, signIn } from 'next-auth/react'
 import { useActiveView } from '@/hooks/use-active-view'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { FileIcon } from './file-icon'
 import { useRouter } from 'next/navigation'
@@ -35,9 +34,9 @@ function CloneView() {
         setIsLoading(true);
         try {
             await setWorkspaceFromGitHub(owner, repo);
-            toast.success(`Cloned ${repo} successfully.`);
+            // The file system hook will handle success toast
         } catch (error: any) {
-            toast.error(error.message);
+            toast.error(error.message || "Failed to clone repository.");
         } finally {
             setIsLoading(false);
         }
@@ -68,11 +67,12 @@ function CloneView() {
 }
 
 function CommitView() {
-    const { allFiles, findFile } = useFileSystem();
+    const { allFiles } = useFileSystem();
     const router = useRouter();
     const [commitMessage, setCommitMessage] = useState('');
 
     // This is a simulation, so we'll just list all files as "changes"
+    // A real implementation would compare against a git state.
     const changedFiles = allFiles; 
 
     const handleFileClick = (file: FileType) => {
