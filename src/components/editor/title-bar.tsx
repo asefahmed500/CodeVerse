@@ -24,10 +24,23 @@ export function TitleBar() {
     : 'CodeVerse';
   
   const languageConfig = activeFile ? getLanguageConfigFromFilename(activeFile.name) : null;
-  const isRunnable = activeFile && !activeFile.isFolder && languageConfig && languageConfig.judge0Id;
+  const isRunnable = activeFile && !activeFile.isFolder;
 
   const handleRun = () => {
     if (!activeFile || !languageConfig) return;
+
+    if (languageConfig.monacoLanguage === 'html') {
+        const blob = new Blob([activeFile.content], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        URL.revokeObjectURL(url);
+        return;
+    }
+      
+    if (!languageConfig.judge0Id) {
+        toast.error(`'${languageConfig.name}' files cannot be run.`);
+        return;
+    }
 
     const path = getPathForFile(activeFile._id);
     if (path) {

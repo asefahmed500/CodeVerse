@@ -38,6 +38,15 @@ export function MainMenuBar() {
   const handleRun = () => {
     if (!activeFile || activeFile.isFolder) return;
     const languageConfig = getLanguageConfigFromFilename(activeFile.name);
+
+    if (languageConfig.monacoLanguage === 'html') {
+        const blob = new Blob([activeFile.content], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        URL.revokeObjectURL(url);
+        return;
+    }
+
     if (!languageConfig?.judge0Id) {
       toast.error(`'${languageConfig.name}' files cannot be run.`);
       return;
@@ -53,7 +62,7 @@ export function MainMenuBar() {
     }
   };
 
-  const isRunnable = activeFile && !activeFile.isFolder && getLanguageConfigFromFilename(activeFile.name)?.judge0Id;
+  const isRunnable = activeFile && !activeFile.isFolder;
 
   return (
     <Menubar className="rounded-none border-none p-0 h-8 bg-transparent">
@@ -122,7 +131,7 @@ export function MainMenuBar() {
         <MenubarTrigger className="h-full px-2">Run</MenubarTrigger>
         <MenubarContent>
           <MenubarItem onSelect={handleRun} disabled={!isRunnable}>
-            Run Code
+            Run File
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>

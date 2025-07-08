@@ -9,43 +9,73 @@ export const LANGUAGE_CONFIG: Record<string, {
     name: "JavaScript",
     extensions: [".js", ".jsx"],
     monacoLanguage: "javascript",
-    judge0Id: 93, // NodeJS (18.15.0)
+    judge0Id: 93,
     runner: "node",
   },
   typescript: {
     name: "TypeScript",
     extensions: [".ts", ".tsx"],
     monacoLanguage: "typescript",
-    judge0Id: 94, // TypeScript (5.0.3)
+    judge0Id: 94,
     runner: "node",
   },
   python: {
     name: "Python",
     extensions: [".py"],
     monacoLanguage: "python",
-    judge0Id: 71, // Python (3.8.1)
+    judge0Id: 71,
     runner: "python",
   },
   java: {
     name: "Java",
     extensions: [".java"],
     monacoLanguage: "java",
-    judge0Id: 62, // Java (OpenJDK 13.0.1)
+    judge0Id: 62,
     runner: "run-java",
   },
   c: {
     name: "C",
     extensions: [".c"],
     monacoLanguage: "c",
-    judge0Id: 52, // C (GCC 9.2.0)
+    judge0Id: 52,
     runner: "run-c",
   },
   cpp: {
     name: "C++",
     extensions: [".cpp", ".cxx"],
     monacoLanguage: "cpp",
-    judge0Id: 54, // C++ (GCC 9.2.0)
+    judge0Id: 54,
     runner: "run-cpp",
+  },
+  csharp: {
+    name: "C#",
+    extensions: [".cs"],
+    monacoLanguage: "csharp",
+    judge0Id: 51,
+  },
+  go: {
+    name: "Go",
+    extensions: [".go"],
+    monacoLanguage: "go",
+    judge0Id: 60,
+  },
+  php: {
+    name: "PHP",
+    extensions: [".php"],
+    monacoLanguage: "php",
+    judge0Id: 70,
+  },
+  ruby: {
+    name: "Ruby",
+    extensions: [".rb"],
+    monacoLanguage: "ruby",
+    judge0Id: 72,
+  },
+  rust: {
+    name: "Rust",
+    extensions: [".rs"],
+    monacoLanguage: "rust",
+    judge0Id: 73,
   },
   html: {
     name: "HTML",
