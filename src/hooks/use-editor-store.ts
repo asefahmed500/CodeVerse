@@ -11,6 +11,8 @@ interface EditorState {
   setSaveHandler: (handler: SaveFunction | null) => void;
   triggerSave: () => void;
   triggerCommand: (commandId: string) => void;
+  cursorPosition: monaco.Position | null;
+  setCursorPosition: (position: monaco.Position | null) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -29,4 +31,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Trigger a command on the Monaco editor instance
     editor?.getAction(commandId)?.run();
   },
+  cursorPosition: null,
+  setCursorPosition: (position) => set({ cursorPosition: position }),
 }));

@@ -1,6 +1,6 @@
 "use client";
 
-import Editor, { OnChange } from "@monaco-editor/react";
+import Editor, { OnChange, type OnMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useState } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
@@ -15,7 +15,7 @@ export function CodeEditor({ file }: { file: FileType }) {
   const { theme } = useTheme();
   const [content, setContent] = useState(file.content);
   const { updateFile } = useFileSystem();
-  const { setEditor, setSaveHandler } = useEditorStore();
+  const { setEditor, setSaveHandler, setCursorPosition } = useEditorStore();
 
   useEffect(() => {
     setContent(file.content);
@@ -48,11 +48,28 @@ export function CodeEditor({ file }: { file: FileType }) {
   }, [immediateSave, setSaveHandler]);
 
   useEffect(() => {
-    // Cleanup editor instance on unmount
+    // Cleanup editor instance and cursor position on unmount
     return () => {
       setEditor(null);
+      setCursorPosition(null);
     };
-  }, [setEditor]);
+  }, [setEditor, setCursorPosition]);
+
+  const handleEditorMount: OnMount = (editor) => {
+    setEditor(editor);
+    setCursorPosition(editor.getPosition());
+    
+    editor.onDidChangeCursorPosition(e => {
+        setCursorPosition(e.position);
+    });
+
+    editor.addCommand(
+        2097, // Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyS
+        () => immediateSave(editor.getValue())
+    );
+
+    editor.focus();
+  };
 
 
   const languageConfig = getLanguageConfigFromFilename(file.name);
@@ -68,14 +85,7 @@ export function CodeEditor({ file }: { file: FileType }) {
           value={content}
           onChange={handleEditorChange}
           options={EDITOR_CONFIG}
-          onMount={(editor) => {
-            setEditor(editor); // Register editor instance with the store
-            editor.addCommand(
-              2097, // Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyS
-              () => immediateSave(editor.getValue())
-            );
-            editor.focus();
-          }}
+          onMount={handleEditorMount}
         />
       </div>
     </div>
