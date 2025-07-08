@@ -44,13 +44,6 @@ export function SettingsView() {
       return null
   }
 
-  const handleVimModeChange = (enabled: boolean) => {
-    if (enabled) {
-      toast.info("Vim mode is not yet implemented.");
-    }
-    setVimMode(enabled);
-  }
-
   const handleResetWorkspace = () => {
     resetFileSystem();
     resetTerminals();
@@ -127,6 +120,14 @@ export function SettingsView() {
                     id="minimap-switch"
                     checked={minimap}
                     onCheckedChange={setMinimap}
+                />
+            </div>
+             <div className='flex items-center justify-between'>
+                <Label htmlFor="vim-mode-switch" className='text-sm'>Vim Keybindings</Label>
+                <Switch 
+                    id="vim-mode-switch"
+                    checked={vimMode}
+                    onCheckedChange={setVimMode}
                 />
             </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Editor, { OnChange, type OnMount } from "@monaco-editor/react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -11,12 +11,18 @@ import { useFileSystem } from "@/hooks/use-file-system";
 import { debounce } from "@/lib/utils";
 import { useEditorStore } from "@/hooks/use-editor-store";
 import { useEditorSettingsStore } from "@/hooks/use-editor-settings-store";
+import { initVimMode } from 'monaco-vim';
+import { getSnippets } from "@/config/snippets";
 
 export function CodeEditor({ file }: { file: FileType }) {
   const { theme } = useTheme();
   const { updateFile } = useFileSystem();
-  const { setEditor, setSaveHandler, setCursorPosition } = useEditorStore();
-  const { fontSize, tabSize, wordWrap, minimap } = useEditorSettingsStore();
+  const { setEditor, setSaveHandler, setCursorPosition, breakpoints, toggleBreakpoint, editor } = useEditorStore();
+  const { fontSize, tabSize, wordWrap, minimap, vimMode } = useEditorSettingsStore();
+
+  const vimModeRef = useRef<any>(null);
+  const editorRef = useRef<any>(null);
+  const decorationsRef = useRef<string[]>([]);
 
   const immediateSave = useCallback((currentContent: string) => {
     updateFile(file._id, { content: currentContent });
@@ -27,44 +33,93 @@ export function CodeEditor({ file }: { file: FileType }) {
 
   const handleEditorChange: OnChange = (value) => {
     const newContent = value || "";
-    // Optimistically update the file in the store to avoid re-renders
     file.content = newContent;
     debouncedSave(newContent);
   };
   
-  // Effect to set up the manual save handler
   useEffect(() => {
     const handler = () => {
-      // Use the most recent content from the file object
       immediateSave(file.content);
     };
     setSaveHandler(() => handler);
     return () => setSaveHandler(null);
   }, [immediateSave, file.content, setSaveHandler]);
 
-  const handleEditorMount: OnMount = (editor) => {
-    setEditor(editor);
-    setCursorPosition(editor.getPosition());
+  // Handle breakpoints
+  useEffect(() => {
+    if (editor) {
+      const fileBreakpoints = breakpoints[file._id] || [];
+      const newDecorations = fileBreakpoints.map(lineNumber => ({
+        range: new editor.monaco.Range(lineNumber, 1, lineNumber, 1),
+        options: {
+          isWholeLine: true,
+          glyphMarginClassName: 'breakpoint-glyph',
+        }
+      }));
+      decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
+    }
+  }, [breakpoints, editor, file._id]);
+
+  // Handle Vim mode
+  useEffect(() => {
+    if (editorRef.current && vimMode) {
+      vimModeRef.current = initVimMode(editorRef.current, document.createElement('div'));
+    } else if (vimModeRef.current) {
+      vimModeRef.current.dispose();
+      vimModeRef.current = null;
+    }
+    return () => {
+      vimModeRef.current?.dispose();
+    };
+  }, [vimMode]);
+
+  const handleEditorMount: OnMount = (mountedEditor, monaco) => {
+    editorRef.current = mountedEditor;
+    setEditor(mountedEditor);
+    setCursorPosition(mountedEditor.getPosition());
     
-    editor.onDidChangeCursorPosition(e => {
-        setCursorPosition(e.position);
+    // Snippets
+    const languageConfig = getLanguageConfigFromFilename(file.name);
+    monaco.languages.registerCompletionItemProvider(languageConfig.monacoLanguage, {
+      provideCompletionItems: (model, position) => {
+        const word = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn,
+        };
+        const suggestions = getSnippets(languageConfig.monacoLanguage).map(s => ({...s, range}));
+        return { suggestions };
+      },
     });
 
-    editor.addCommand(
-        2097, // Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyS
-        () => immediateSave(editor.getValue())
+    // Breakpoints
+    mountedEditor.onMouseDown(e => {
+      const target = e.target;
+      if (target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN && target.position) {
+        toggleBreakpoint(file._id, target.position.lineNumber);
+      }
+    });
+
+    mountedEditor.onDidChangeCursorPosition(e => {
+      setCursorPosition(e.position);
+    });
+
+    mountedEditor.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+        () => immediateSave(mountedEditor.getValue())
     );
 
-    editor.focus();
+    mountedEditor.focus();
   };
-
-  const languageConfig = getLanguageConfigFromFilename(file.name);
 
   const editorOptions = {
     ...EDITOR_CONFIG,
     fontSize,
     tabSize,
     wordWrap,
+    glyphMargin: true, // For breakpoints
     minimap: {
       ...EDITOR_CONFIG.minimap,
       enabled: minimap,
@@ -77,7 +132,7 @@ export function CodeEditor({ file }: { file: FileType }) {
         <Editor
           height="100%"
           path={file.name}
-          defaultLanguage={languageConfig.monacoLanguage}
+          defaultLanguage={getLanguageConfigFromFilename(file.name).monacoLanguage}
           theme={theme === "dark" ? "vs-dark" : "light"}
           defaultValue={file.content}
           onChange={handleEditorChange}

@@ -65,3 +65,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .breakpoint-glyph {
+    background: hsl(var(--destructive));
+    border-radius: 50%;
+    width: 8px !important;
+    height: 8px !important;
+    margin-left: 3px;
+    margin-top: 5px;
+  }
+}

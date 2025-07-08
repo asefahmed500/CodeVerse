@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type * as monaco from 'monaco-editor';
 
 // A function that can save content. It's passed from CodeEditor.
-type SaveFunction = () => Promise<void>;
+type SaveFunction = () => void;
 
 interface EditorState {
   editor: monaco.editor.IStandaloneCodeEditor | null;
@@ -13,6 +13,8 @@ interface EditorState {
   triggerCommand: (commandId: string) => void;
   cursorPosition: monaco.Position | null;
   setCursorPosition: (position: monaco.Position | null) => void;
+  breakpoints: Record<string, number[]>; // fileId -> line numbers
+  toggleBreakpoint: (fileId: string, lineNumber: number) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -33,4 +35,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   cursorPosition: null,
   setCursorPosition: (position) => set({ cursorPosition: position }),
+  breakpoints: {},
+  toggleBreakpoint: (fileId: string, lineNumber: number) => {
+    set(state => {
+      const fileBreakpoints = state.breakpoints[fileId] || [];
+      const newBreakpoints = fileBreakpoints.includes(lineNumber)
+        ? fileBreakpoints.filter(ln => ln !== lineNumber)
+        : [...fileBreakpoints, lineNumber];
+      return {
+        breakpoints: {
+          ...state.breakpoints,
+          [fileId]: newBreakpoints
+        }
+      };
+    });
+  },
 }));

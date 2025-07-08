@@ -1,7 +1,6 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { CodeEditor } from "@/components/editor/code-editor";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useEffect } from "react";
 import {
@@ -11,6 +10,19 @@ import {
 } from "@/components/ui/resizable";
 import { SidebarView } from "@/components/editor/sidebar-view";
 import { useSidebarStore } from "@/hooks/use-sidebar-store";
+import dynamic from "next/dynamic";
+
+const CodeEditor = dynamic(
+  () => import("@/components/editor/code-editor").then((mod) => mod.CodeEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center flex-1 h-full bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    ),
+  }
+);
 
 export default function EditorFilePage() {
   const params = useParams();
