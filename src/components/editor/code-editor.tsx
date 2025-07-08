@@ -41,11 +41,11 @@ export function CodeEditor({ file }: { file: FileType }) {
   };
   
   useEffect(() => {
-    setSaveHandler(() => immediateSave);
+    setSaveHandler(() => () => immediateSave(content));
     return () => {
       setSaveHandler(null);
     };
-  }, [immediateSave, setSaveHandler]);
+  }, [immediateSave, content, setSaveHandler]);
 
   useEffect(() => {
     return () => {

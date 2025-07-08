@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
@@ -154,12 +153,34 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     return buildPath(fileId);
   }, [files]);
 
+  const findUniqueName = (name: string, parentId?: string) => {
+    const parentChildren = parentId 
+        ? findNodeInTree(files, parentId)?.children
+        : files;
+        
+    if (!parentChildren) return name;
+
+    let finalName = name;
+    let counter = 1;
+    const nameParts = name.split('.');
+    const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
+    const baseName = nameParts.join('.');
+
+    while (parentChildren.some(f => f.name === finalName)) {
+        finalName = `${baseName}-${counter}${ext}`;
+        counter++;
+    }
+    return finalName;
+  }
+
   const createFile = async (name: string, parentId?: string): Promise<FileType | null> => {
+    const uniqueName = findUniqueName(name, parentId);
+    
     try {
       const res = await fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, isFolder: false, parentId, isActive: true, isOpen: true }),
+        body: JSON.stringify({ name: uniqueName, isFolder: false, parentId, isActive: true, isOpen: true }),
       });
 
       if (!res.ok) {
@@ -184,11 +205,13 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
   };
 
   const createFolder = async (name: string, parentId?: string): Promise<FileType | null> => {
+    const uniqueName = findUniqueName(name, parentId);
+    
     try {
       const res = await fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, isFolder: true, parentId }),
+        body: JSON.stringify({ name: uniqueName, isFolder: true, parentId }),
       });
       if (!res.ok) {
         const { error } = await res.json();

@@ -105,12 +105,12 @@ export function TerminalManager() {
   }, [updateTerminal]);
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e] text-[#cccccc]">
+    <div className="h-full flex flex-col bg-background text-foreground">
       <div className="flex items-center border-b border-border">
         {terminals.map((terminal) => (
           <div
             key={terminal._id}
-            className={`px-3 py-1.5 text-sm flex items-center border-r border-border cursor-pointer group ${activeTerminalId === terminal._id ? 'bg-[#1e1e1e] text-white' : 'text-muted-foreground hover:bg-secondary'}`}
+            className={`px-3 py-1.5 text-sm flex items-center border-r border-border cursor-pointer group ${activeTerminalId === terminal._id ? 'bg-background text-foreground' : 'text-muted-foreground hover:bg-secondary'}`}
             onClick={() => handleSelectTerminal(terminal._id)}
           >
             {terminal.title}

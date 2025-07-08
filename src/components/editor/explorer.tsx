@@ -1,4 +1,3 @@
-
 "use client";
 
 import { ChevronRight, ChevronDown, FolderPlus, FilePlus, RefreshCw, X, Pencil } from "lucide-react";
@@ -85,9 +84,9 @@ function FileTree() {
 
   return (
     <div className="flex-1 overflow-y-auto p-1">
-      <div className="flex items-center p-1">
+      <div className="flex items-center p-1 font-bold text-sm uppercase">
           <ChevronDown size={16}/>
-          <span className="font-bold text-sm ml-1 uppercase">CodeVerse</span>
+          <span className="ml-1">CodeVerse</span>
       </div>
       {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}
     </div>
@@ -122,9 +121,11 @@ function FileTreeItem({
 
   const isEditing = editingId === file._id;
 
-  const handleItemClick = () => {
+  const handleItemClick = (e: React.MouseEvent) => {
     if (isEditing) return;
-
+    
+    e.stopPropagation();
+    
     if (file.isFolder) {
       onToggleExpand(file._id);
       setActiveFile(file);
@@ -132,20 +133,26 @@ function FileTreeItem({
       router.push(`/editor/${file._id}`);
     }
   };
-
+  
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setActiveFile(file);
     // The DropdownMenuTrigger will handle opening the menu.
     // We manually trigger a click to open it, as an alternative to managing open state.
-    (e.currentTarget as HTMLElement).click();
+    const trigger = e.currentTarget.querySelector('[data-context-menu-trigger="true"]');
+    if (trigger instanceof HTMLElement) {
+        trigger.click();
+    }
   }
   
   return (
     <div>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <div
+          <div data-context-menu-trigger="true" className="w-full"></div>
+      </DropdownMenuTrigger>
+      <div
           className={`flex items-center py-1 px-2 rounded hover:bg-accent cursor-pointer group ${activeFile?._id === file._id ? "bg-muted" : ""}`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={handleItemClick}
@@ -173,7 +180,6 @@ function FileTreeItem({
               <span className="truncate text-sm">{file.name}</span>
           )}
         </div>
-      </DropdownMenuTrigger>
       <DropdownMenuContent className="w-48" align="start">
           {file.isFolder && (
             <>

@@ -25,7 +25,7 @@ export default function NewFilePage() {
   }, [createFile, loading, router]);
 
   return (
-    <div className="flex items-center justify-center flex-1 bg-[#1e1e1e] h-full">
+    <div className="flex items-center justify-center flex-1 bg-background h-full">
       <p>Creating new file...</p>
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary ml-4"></div>
     </div>

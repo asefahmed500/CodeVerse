@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type * as monaco from 'monaco-editor';
 
 // A function that can save content. It's passed from CodeEditor.
-type SaveFunction = (content: string) => Promise<void>;
+type SaveFunction = () => Promise<void>;
 
 interface EditorState {
   editor: monaco.editor.IStandaloneCodeEditor | null;
@@ -21,9 +21,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   saveHandler: null,
   setSaveHandler: (handler) => set({ saveHandler: handler }),
   triggerSave: () => {
-    const { editor, saveHandler } = get();
-    if (editor && saveHandler) {
-      saveHandler(editor.getValue());
+    const { saveHandler } = get();
+    if (saveHandler) {
+      saveHandler();
     }
   },
   triggerCommand: (commandId: string) => {
