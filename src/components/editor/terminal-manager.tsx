@@ -3,8 +3,6 @@
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Plus, X } from 'lucide-react'
-import type { FileType } from '@/types'
-import { useFileSystem } from '@/hooks/use-file-system'
 import { useTerminalManager } from '@/hooks/use-terminal-manager-store'
 
 const Terminal = dynamic(
@@ -13,7 +11,6 @@ const Terminal = dynamic(
 );
 
 export function TerminalManager() {
-  const { allFiles } = useFileSystem();
   const { terminals, activeTerminalId, addTerminal, removeTerminal, setActiveTerminalId, updateTerminal } = useTerminalManager();
 
   return (
@@ -51,7 +48,7 @@ export function TerminalManager() {
             className={`h-full absolute top-0 left-0 w-full transition-opacity ${activeTerminalId === terminal._id ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
           >
              {activeTerminalId === terminal._id && (
-                <Terminal terminal={terminal} onUpdate={updateTerminal} files={allFiles} />
+                <Terminal terminal={terminal} onUpdate={updateTerminal} />
              )}
           </div>
         ))}

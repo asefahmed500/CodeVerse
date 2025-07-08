@@ -10,58 +10,61 @@ import { debounce } from "@/lib/utils";
 import { useTerminalStore } from "@/hooks/use-terminal-store";
 import { executeCode } from "@/lib/code-runner";
 import { getLanguageConfigFromFilename } from "@/config/languages";
+import { useFileSystem } from "@/hooks/use-file-system";
 
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
 
-const findNodeByPath = (files: FileType[], path: string): { node: FileType | null, parent: FileType | null } => {
-    const fileMap = new Map(files.map(f => [f._id, f]));
-    const rootFiles = files.filter(f => !f.parentId);
-
-    if (path === '/') return { node: { _id: 'root', name: '/', isFolder: true, children: rootFiles } as any, parent: null };
-    
-    const parts = path.startsWith('/') ? path.substring(1).split('/') : path.split('/');
-    
-    let currentNode: FileType | null = { _id: 'root', name: '/', isFolder: true, children: rootFiles } as any;
-    let parent: FileType | null = null;
-    
-    for (const part of parts) {
-        if (!currentNode || !currentNode.isFolder || !currentNode.children) return { node: null, parent: null };
-        const children = currentNode.children.map(c => typeof c === 'string' ? fileMap.get(c) : c).filter(Boolean) as FileType[];
-        const found = children.find(f => f.name === part);
-        if (found) {
-            parent = currentNode;
-            currentNode = found;
-        } else {
-            return { node: null, parent: null };
-        }
+const getChildrenOfPath = (allFiles: FileType[], path: string): FileType[] => {
+    if (path === '/') {
+        return allFiles.filter(f => !f.parentId);
     }
-    return { node: currentNode, parent: parent };
-}
-
-const getChildrenOfPath = (files: FileType[], path: string): FileType[] => {
-    const fileMap = new Map(files.map(f => [f._id, f]));
-    const { node } = findNodeByPath(files, path);
-    if (node && node.isFolder && node.children) {
-        return node.children.map(c => typeof c === 'string' ? fileMap.get(c) : c).filter(Boolean) as FileType[];
+    const parent = findNodeByPath(allFiles, path);
+    if (parent && parent.isFolder) {
+        return allFiles.filter(f => f.parentId === parent._id);
     }
     return [];
-}
+};
+
+const findNodeByPath = (allFiles: FileType[], path: string): FileType | null => {
+    if (path === '/') {
+        // This is a virtual root, not a real file object
+        return { _id: 'root', name: '/', isFolder: true, children: allFiles.filter(f => !f.parentId) } as any;
+    }
+    
+    const parts = path.split('/').filter(Boolean);
+    let currentNode: FileType | null = null;
+    let currentChildren = allFiles.filter(f => !f.parentId);
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const foundNode = currentChildren.find(c => c.name === part);
+        if (!foundNode) return null;
+
+        currentNode = foundNode;
+        if (foundNode.isFolder) {
+            currentChildren = allFiles.filter(f => f.parentId === foundNode._id);
+        } else if (i < parts.length - 1) {
+            // It's a file, but not the last part of the path
+            return null;
+        }
+    }
+    return currentNode;
+};
 
 
 export function Terminal({
   terminal,
   onUpdate,
-  files,
 }: {
   terminal: TerminalSessionType;
   onUpdate: (id: string, updates: Partial<TerminalSessionType>) => void;
-  files: FileType[];
 }) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xterm = useRef<XTerminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const { theme } = useTheme();
   const { commandToRun, commandProcessed } = useTerminalStore();
+  const { allFiles } = useFileSystem();
 
   const [currentPath, setCurrentPath] = useState('/');
   const [currentLine, setCurrentLine] = useState('');
@@ -101,7 +104,7 @@ export function Terminal({
             term.writeln('  help         - Show this help message');
             break;
         case 'ls':
-            const children = getChildrenOfPath(files, currentPath);
+            const children = getChildrenOfPath(allFiles, currentPath);
             if (children.length === 0) {
                 term.writeln('\r\n(empty)');
             } else {
@@ -114,11 +117,11 @@ export function Terminal({
         case 'cd':
             const target = args[0] || '/';
             if (target === '..') {
-                const newPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
+                const newPath = currentPath === '/' ? '/' : currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
                 setCurrentPath(newPath);
             } else {
                 const newPath = target.startsWith('/') ? target : `${currentPath === '/' ? '' : currentPath}/${target}`;
-                const { node } = findNodeByPath(files, newPath);
+                const node = findNodeByPath(allFiles, newPath);
                 if (node && node.isFolder) {
                     setCurrentPath(newPath);
                 } else if (newPath === '/') {
@@ -134,7 +137,7 @@ export function Terminal({
                 term.writeln('\r\ncat: missing operand');
                 break;
             }
-            const fileChildren = getChildrenOfPath(files, currentPath);
+            const fileChildren = getChildrenOfPath(allFiles, currentPath);
             const fileToRead = fileChildren.find(f => f.name === filename && !f.isFolder);
             if (fileToRead) {
                 term.writeln(`\r\n${fileToRead.content.replace(/\n/g, '\r\n')}`);
@@ -162,7 +165,7 @@ export function Terminal({
                 break;
             }
             const fullPath = pathArg.startsWith('/') ? pathArg : `${currentPath === '/' ? '' : currentPath}/${pathArg}`;
-            const { node: fileToRun } = findNodeByPath(files, fullPath);
+            const fileToRun = findNodeByPath(allFiles, fullPath);
             const langConfig = fileToRun ? getLanguageConfigFromFilename(fileToRun.name) : null;
             
             if (fileToRun && !fileToRun.isFolder && langConfig && langConfig.judge0Id) {
@@ -186,7 +189,7 @@ export function Terminal({
             term.writeln(`\r\nCommand not found: ${cmd}. Type 'help' for a list of commands.`);
             break;
     }
-  }, [commandHistory, currentPath, debouncedUpdate, files]);
+  }, [commandHistory, currentPath, debouncedUpdate, allFiles]);
 
 
   useEffect(() => {
@@ -249,7 +252,7 @@ export function Terminal({
         }
     });
 
-    xterm.current.writeln('Welcome to Aethermind Terminal!');
+    xterm.current.writeln('Welcome to CodeVerse Terminal!');
     xterm.current.writeln("Type 'help' for a list of available commands.");
     xterm.current.write(prompt(currentPath));
     
@@ -259,6 +262,7 @@ export function Terminal({
     
     return () => {
       resizeObserver.disconnect();
+      xterm.current?.dispose();
     };
   }, []);
 
@@ -291,6 +295,13 @@ export function Terminal({
       }, 100);
     }
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
+  
+    useEffect(() => {
+        if (xterm.current) {
+            xterm.current.write('\x1b[2K\r' + prompt(currentPath) + currentLine);
+        }
+    }, [currentPath]);
+
 
   return (
     <div ref={terminalRef} className="h-full w-full p-2" />
