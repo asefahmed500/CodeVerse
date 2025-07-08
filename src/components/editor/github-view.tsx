@@ -9,6 +9,7 @@ import { useSession, signIn } from 'next-auth/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GitHubRepo, GitHubContentItem, GitHubBranch } from '@/types'
 import { useActiveView } from '@/hooks/use-active-view'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 
 export function GitHubView() {
   const { data: session } = useSession()
@@ -61,18 +62,6 @@ export function GitHubView() {
       toast.error(error.message || 'Failed to load repository details')
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const createPullRequest = async () => {
-    if (!selectedRepo || !prMessage) return
-    
-    try {
-      // In a real scenario, we would create a new branch, commit changes, and then create a PR.
-      // This is a simplified version for demonstration.
-      toast.info("PR creation is a demo feature.");
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create pull request')
     }
   }
 
@@ -167,14 +156,24 @@ export function GitHubView() {
               onChange={(e) => setPrMessage(e.target.value)}
               className="bg-background border-input text-foreground mb-2"
             />
-            <Button
-              className="w-full bg-primary hover:bg-primary/90"
-              onClick={createPullRequest}
-              disabled={!prMessage || isLoading}
-            >
-              <GitPullRequest className="h-4 w-4 mr-2" />
-              Commit & Create Pull Request
-            </Button>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <div className='w-full'>
+                            <Button
+                                className="w-full bg-primary hover:bg-primary/90"
+                                disabled={true}
+                            >
+                                <GitPullRequest className="h-4 w-4 mr-2" />
+                                Commit & Create Pull Request
+                            </Button>
+                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>This is a demo feature and is not implemented.</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}

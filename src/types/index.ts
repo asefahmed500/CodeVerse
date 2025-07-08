@@ -10,15 +10,13 @@ export interface FileType {
   isActive: boolean
   createdAt: Date
   updatedAt: Date
-  children: FileType[]
+  children?: FileType[]
 }
 
 export interface TerminalSessionType {
   _id: string
   title: string
-  content: string
   commands: string[]
-  currentCommandIndex: number
   isActive: boolean
   userId: string
   createdAt: Date

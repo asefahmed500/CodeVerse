@@ -1,56 +1,213 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import { Terminal as XTerminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
-import type { TerminalSessionType } from "@/types";
+import type { FileType, TerminalSessionType } from "@/types";
 import { useTheme } from "next-themes";
 import { debounce } from "@/lib/utils";
 
-const prompt = "\n\r$ ";
+const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
+
+const findNodeByPath = (files: FileType[], path: string): { node: FileType | null, parent: FileType | null } => {
+    if (path === '/') return { node: null, parent: null };
+    const parts = path.split('/').filter(p => p);
+    let currentNode: FileType | null = null;
+    let parent: FileType | null = null;
+    let currentChildren = files;
+
+    for (const part of parts) {
+        const found = currentChildren.find(f => f.name === part);
+        if (found) {
+            parent = currentNode;
+            currentNode = found;
+            currentChildren = found.children || [];
+        } else {
+            return { node: null, parent: null };
+        }
+    }
+    return { node: currentNode, parent: parent };
+}
+
+const getChildrenOfPath = (files: FileType[], path: string): FileType[] => {
+    if (path === '/') return files;
+    const { node } = findNodeByPath(files, path);
+    if (node && node.isFolder) {
+        return node.children || [];
+    }
+    return [];
+}
+
 
 export function Terminal({
   terminal,
   onUpdate,
+  files,
 }: {
   terminal: TerminalSessionType;
   onUpdate: (id: string, updates: Partial<TerminalSessionType>) => void;
+  files: FileType[];
 }) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xterm = useRef<XTerminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const { theme } = useTheme();
 
-  const debouncedUpdate = useCallback(debounce((content: string) => {
-      onUpdate(terminal._id, { content });
+  const [currentPath, setCurrentPath] = useState('/');
+  const [currentLine, setCurrentLine] = useState('');
+  const [commandHistory, setCommandHistory] = useState<string[]>(terminal.commands || []);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const debouncedUpdate = useCallback(debounce((updates: Partial<TerminalSessionType>) => {
+      onUpdate(terminal._id, updates);
   }, 1000), [terminal._id, onUpdate]);
 
-  useEffect(() => {
-    if (!terminalRef.current) return;
+  const executeCommand = (command: string) => {
+    if (!xterm.current) return;
+
+    const [cmd, ...args] = command.trim().split(' ');
+    const term = xterm.current;
     
-    if (!xterm.current) {
-        xterm.current = new XTerminal({
-            cursorBlink: true,
-            fontFamily: "'Source Code Pro', monospace",
-            fontSize: 14,
-            allowProposedApi: true,
-        });
-        
-        fitAddon.current = new FitAddon();
-        xterm.current.loadAddon(fitAddon.current);
+    const newHistory = [command, ...commandHistory];
+    setCommandHistory(newHistory);
+    debouncedUpdate({ commands: newHistory });
 
-        xterm.current.open(terminalRef.current);
-        
-        xterm.current.onData(e => {
-            xterm.current?.write(e);
-            const currentContent = xterm.current!.buffer.active.getLine(xterm.current!.buffer.active.baseY + xterm.current!.buffer.active.cursorY)?.translateToString(true) || '';
-            debouncedUpdate(currentContent);
-        });
-
-        xterm.current.writeln(terminal.content || 'Welcome to CodeVerse Terminal!');
-        xterm.current.write(prompt);
+    switch (cmd) {
+        case 'help':
+            term.writeln('\r\nAvailable commands:');
+            term.writeln('  ls       - List directory contents');
+            term.writeln('  cd [dir] - Change directory');
+            term.writeln('  cat [file] - Display file content');
+            term.writeln('  pwd      - Print working directory');
+            term.writeln('  echo     - Display a line of text');
+            term.writeln('  clear    - Clear the terminal screen');
+            term.writeln('  help     - Show this help message');
+            break;
+        case 'ls':
+            const children = getChildrenOfPath(files, currentPath);
+            if (children.length === 0) {
+                term.writeln('\r\n(empty)');
+            } else {
+                term.writeln('');
+                children.forEach(child => {
+                    term.writeln(`\r${child.isFolder ? `\x1b[1;34m${child.name}\x1b[0m` : child.name}`);
+                });
+            }
+            break;
+        case 'cd':
+            const target = args[0] || '/';
+            if (target === '..') {
+                const newPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
+                setCurrentPath(newPath);
+            } else {
+                const newPath = target.startsWith('/') ? target : `${currentPath === '/' ? '' : currentPath}/${target}`;
+                const { node } = findNodeByPath(files, newPath);
+                if (node && node.isFolder) {
+                    setCurrentPath(newPath);
+                } else if (newPath === '/') {
+                    setCurrentPath('/');
+                } else {
+                    term.writeln(`\r\ncd: no such file or directory: ${target}`);
+                }
+            }
+            break;
+        case 'cat':
+            const filename = args[0];
+            if (!filename) {
+                term.writeln('\r\ncat: missing operand');
+                break;
+            }
+            const fileChildren = getChildrenOfPath(files, currentPath);
+            const fileToRead = fileChildren.find(f => f.name === filename && !f.isFolder);
+            if (fileToRead) {
+                term.writeln(`\r\n${fileToRead.content.replace(/\n/g, '\r\n')}`);
+            } else {
+                term.writeln(`\r\ncat: ${filename}: No such file`);
+            }
+            break;
+        case 'pwd':
+            term.writeln(`\r\n${currentPath}`);
+            break;
+        case 'echo':
+            term.writeln(`\r\n${args.join(' ')}`);
+            break;
+        case 'clear':
+            term.clear();
+            break;
+        case '':
+            break;
+        default:
+            term.writeln(`\r\nCommand not found: ${cmd}. Type 'help' for a list of commands.`);
+            break;
     }
+  }
+
+  useEffect(() => {
+    if (!terminalRef.current || xterm.current) return;
+    
+    xterm.current = new XTerminal({
+        cursorBlink: true,
+        fontFamily: "'Source Code Pro', monospace",
+        fontSize: 14,
+        allowProposedApi: true,
+    });
+    
+    fitAddon.current = new FitAddon();
+    xterm.current.loadAddon(fitAddon.current);
+    xterm.current.open(terminalRef.current);
+    
+    xterm.current.onData(e => {
+        if (!xterm.current) return;
+        
+        switch (e) {
+            case '\r': // Enter
+                xterm.current.write(prompt(currentPath));
+                if (currentLine.trim()) {
+                    executeCommand(currentLine);
+                }
+                setCurrentLine('');
+                setHistoryIndex(-1);
+                break;
+            case '\u007F': // Backspace
+                if (currentLine.length > 0) {
+                    xterm.current.write('\b \b');
+                    setCurrentLine(currentLine.slice(0, -1));
+                }
+                break;
+            case '\u001b[A': // Up arrow
+                if (historyIndex < commandHistory.length - 1) {
+                    const newIndex = historyIndex + 1;
+                    setHistoryIndex(newIndex);
+                    const cmd = commandHistory[newIndex];
+                    xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                    setCurrentLine(cmd);
+                }
+                break;
+            case '\u001b[B': // Down arrow
+                if (historyIndex > 0) {
+                    const newIndex = historyIndex - 1;
+                    setHistoryIndex(newIndex);
+                    const cmd = commandHistory[newIndex];
+                    xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                    setCurrentLine(cmd);
+                } else {
+                    setHistoryIndex(-1);
+                    xterm.current.write('\x1b[2K\r' + prompt(currentPath));
+                    setCurrentLine('');
+                }
+                break;
+            default:
+                if (e >= String.fromCharCode(0x20) && e <= String.fromCharCode(0x7e)) {
+                    setCurrentLine(currentLine + e);
+                    xterm.current.write(e);
+                }
+        }
+    });
+
+    xterm.current.writeln('Welcome to CodeVerse Terminal!');
+    xterm.current.writeln("Type 'help' for a list of available commands.");
+    xterm.current.write(prompt(currentPath));
     
     fitAddon.current?.fit();
     const resizeObserver = new ResizeObserver(() => fitAddon.current?.fit());
@@ -67,10 +224,12 @@ export function Terminal({
             background: "#1e1e1e",
             foreground: "#cccccc",
             cursor: "#ffffff",
+            selection: "#555555"
         } : {
             background: "#ffffff",
             foreground: "#333333",
             cursor: "#000000",
+            selection: "#dddddd"
         };
     }
   }, [theme]);

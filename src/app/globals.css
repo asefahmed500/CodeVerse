@@ -10,50 +10,50 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 207 100% 34%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 180 100% 50%;
+    --primary-foreground: 180 100% 10%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
-    --accent: 210 4% 17%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 195 53% 79%;
+    --accent-foreground: 195 53% 10%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 207 100% 34%;
+    --ring: 180 100% 50%;
     --radius: 0.5rem;
   }
  
   .dark {
-    --background: 0 0% 12%; /* #1e1e1e */
-    --foreground: 0 0% 80%; /* #cccccc */
+    --background: 180 5% 18%;
+    --foreground: 180 5% 80%;
 
-    --card: 220 1% 15%; /* #252526 */
-    --card-foreground: 0 0% 80%; /* #cccccc */
+    --card: 180 5% 20%;
+    --card-foreground: 180 5% 80%;
 
-    --popover: 220 1% 15%; /* #252526 */
-    --popover-foreground: 0 0% 80%; /* #cccccc */
+    --popover: 180 5% 15%;
+    --popover-foreground: 180 5% 80%;
 
-    --primary: 207 100% 34%; /* #007acc */
-    --primary-foreground: 0 0% 100%; /* #ffffff */
+    --primary: 180 100% 50%;
+    --primary-foreground: 180 100% 10%;
 
-    --secondary: 0 0% 20%; /* #333333 */
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 180 5% 25%;
+    --secondary-foreground: 180 5% 98%;
 
-    --muted: 220 1% 15%; /* #252526 */
-    --muted-foreground: 0 0% 52%; /* #858585 */
+    --muted: 180 5% 22%;
+    --muted-foreground: 180 5% 55%;
 
-    --accent: 210 4% 17%; /* #2a2d2e */
-    --accent-foreground: 0 0% 98%;
+    --accent: 195 53% 79%;
+    --accent-foreground: 195 53% 10%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 180 5% 98%;
 
-    --border: 0 0% 24%; /* #3c3c3c */
-    --input: 0 0% 24%; /* #3c3c3c */
-    --ring: 207 100% 34%; /* #007acc */
+    --border: 180 5% 30%;
+    --input: 180 5% 30%;
+    --ring: 180 100% 50%;
   }
 }
  

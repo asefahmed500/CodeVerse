@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Plus, X } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import type { TerminalSessionType } from '@/types'
+import type { FileType, TerminalSessionType } from '@/types'
+import { useFileSystem } from '@/hooks/use-file-system'
 
 const Terminal = dynamic(
   () => import('./terminal').then((mod) => mod.Terminal), 
@@ -15,6 +16,7 @@ const Terminal = dynamic(
 
 export function TerminalManager() {
   const { data: session } = useSession()
+  const { files } = useFileSystem();
   const [terminals, setTerminals] = useState<TerminalSessionType[]>([])
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null)
 
@@ -26,6 +28,7 @@ export function TerminalManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ terminalId, ...updates })
       })
+      setTerminals(prev => prev.map(t => t._id === terminalId ? {...t, ...updates} : t));
     } catch (error) {
       console.error('Failed to update terminal:', error)
     }
@@ -103,16 +106,16 @@ export function TerminalManager() {
 
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e] text-[#cccccc]">
-      <div className="flex items-center border-b border-[#3c3c3c]">
+      <div className="flex items-center border-b border-border">
         {terminals.map((terminal) => (
           <div
             key={terminal._id}
-            className={`px-3 py-1.5 text-sm flex items-center border-r border-[#3c3c3c] cursor-pointer group ${activeTerminalId === terminal._id ? 'bg-[#1e1e1e] text-white' : 'text-[#858585] hover:bg-[#2a2d2e]'}`}
+            className={`px-3 py-1.5 text-sm flex items-center border-r border-border cursor-pointer group ${activeTerminalId === terminal._id ? 'bg-[#1e1e1e] text-white' : 'text-muted-foreground hover:bg-secondary'}`}
             onClick={() => handleSelectTerminal(terminal._id)}
           >
             {terminal.title}
             <button
-              className="ml-2 hover:text-[#cccccc] opacity-0 group-hover:opacity-100"
+              className="ml-2 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
               onClick={(e) => { e.stopPropagation(); removeTerminal(terminal._id) }}
             >
               <X className="h-3 w-3" />
@@ -122,7 +125,7 @@ export function TerminalManager() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 ml-1 text-[#858585] hover:bg-[#2a2d2e] hover:text-[#cccccc]"
+          className="h-8 w-8 ml-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
           onClick={addTerminal}
         >
           <Plus className="h-4 w-4" />
@@ -136,7 +139,7 @@ export function TerminalManager() {
             className={`h-full absolute top-0 left-0 w-full transition-opacity ${activeTerminalId === terminal._id ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
           >
              {activeTerminalId === terminal._id && (
-                <Terminal terminal={terminal} onUpdate={updateTerminal} />
+                <Terminal terminal={terminal} onUpdate={updateTerminal} files={files} />
              )}
           </div>
         ))}

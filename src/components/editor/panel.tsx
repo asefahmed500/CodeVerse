@@ -5,12 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useActiveView } from "@/hooks/use-active-view";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TerminalManager } from "./terminal-manager";
+import dynamic from "next/dynamic";
+
+const TerminalManager = dynamic(
+  () => import('./terminal-manager').then(mod => mod.TerminalManager),
+  { ssr: false, loading: () => <p className="p-2 text-sm">Loading Terminal...</p> }
+);
 
 export function Panel() {
   const { activeView, setActiveView } = useActiveView();
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [isTerminalMounted, setIsTerminalMounted] = useState(false);
 
   const isTerminalActive = activeView === "terminal";
 
@@ -20,12 +24,17 @@ export function Panel() {
     }
   }, [isTerminalActive, isCollapsed]);
 
-  useEffect(() => {
-    if (isTerminalActive && !isCollapsed) {
-      setIsTerminalMounted(true);
-    }
-  }, [isTerminalActive, isCollapsed]);
 
+  const handleTabClick = () => {
+    if(isTerminalActive) {
+      if (isCollapsed) {
+        setIsCollapsed(false);
+      }
+    } else {
+      setActiveView('terminal');
+      setIsCollapsed(false);
+    }
+  }
 
   return (
     <div
@@ -42,10 +51,7 @@ export function Panel() {
             <TabsTrigger
               value="terminal"
               className="h-full text-xs rounded-none border-t-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3"
-              onClick={() => {
-                setActiveView("terminal");
-                if (isCollapsed) setIsCollapsed(false);
-              }}
+              onClick={handleTabClick}
             >
               TERMINAL
             </TabsTrigger>
@@ -68,7 +74,12 @@ export function Panel() {
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-foreground hover:bg-accent"
-              onClick={() => setIsCollapsed(true)}
+              onClick={() => {
+                setIsCollapsed(true);
+                if (isTerminalActive) {
+                    setActiveView(null);
+                }
+              }}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -78,7 +89,7 @@ export function Panel() {
         {!isCollapsed && (
           <div className="flex-1 bg-background overflow-hidden">
             <TabsContent value="terminal" className="h-full mt-0">
-              {isTerminalMounted && <TerminalManager />}
+              <TerminalManager />
             </TabsContent>
           </div>
         )}
