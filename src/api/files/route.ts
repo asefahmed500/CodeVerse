@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { name, isFolder, parentId, language } = await request.json()
+  const { name, isFolder, parentId, language, isOpen } = await request.json()
   const userId = (session.user as any).id;
 
   try {
@@ -66,7 +66,8 @@ export async function POST(request: Request) {
       parentId: parentId || null,
       userId,
       language: isFolder ? undefined : (language || "plaintext"),
-      isActive: !isFolder
+      isActive: !isFolder,
+      isOpen: isFolder ? false : isOpen,
     })
 
     await newFile.save()

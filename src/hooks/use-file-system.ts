@@ -134,62 +134,90 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     return buildPath(fileId);
   }, [files]);
 
+  const getUniqueName = useCallback((baseName: string, parentId: string | undefined | null): string => {
+    const existingNames = new Set<string>();
 
-  const createFile = async (name: string, parentId?: string) => {
-    try {
-        const res = await fetch("/api/files", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, isFolder: false, parentId, isActive: true, isOpen: true }),
+    function findNames(items: FileType[], targetParentId: string | null) {
+      if (targetParentId === null) {
+        items.forEach(item => {
+          if (item.parentId === null) existingNames.add(item.name);
         });
-        
-        if (!res.ok) {
-            if (res.status === 409) {
-                const { error } = await res.json();
-                toast.error(error);
-            } else {
-                toast.error("Failed to create file");
-            }
-            return null;
+        return;
+      }
+
+      for (const item of items) {
+        if (item._id === targetParentId && item.isFolder) {
+          (item.children || []).forEach(child => existingNames.add(child.name));
+          return;
         }
+        if (item.isFolder && item.children) {
+          findNames(item.children, targetParentId);
+        }
+      }
+    }
+    findNames(files, parentId || null);
 
-        const newFile = await res.json();
-        
-        setFiles(prev => {
-            const deactivated = deactivateAllFiles(prev);
-            return addFileToTree(deactivated, newFile)
-        });
-        setActiveFile(newFile);
-        router.push(`/editor/${newFile._id}`);
-        return newFile;
-    } catch (e) {
-        toast.error("An unexpected error occurred.");
+    let newName = baseName;
+    let counter = 1;
+    const nameParts = baseName.split('.');
+    const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
+    const nameWithoutExt = nameParts.join('.');
+
+    while (existingNames.has(newName)) {
+      newName = `${nameWithoutExt}-${counter}${ext || ''}`;
+      counter++;
+    }
+    return newName;
+  }, [files]);
+
+  const createFile = async (name: string, parentId?: string): Promise<FileType | null> => {
+    const uniqueName = getUniqueName(name, parentId);
+    try {
+      const res = await fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: uniqueName, isFolder: false, parentId, isActive: true, isOpen: true }),
+      });
+
+      if (!res.ok) {
+        const { error } = await res.json();
+        toast.error(error || "Failed to create file");
         return null;
+      }
+
+      const newFile = await res.json();
+      setFiles(prev => {
+        const deactivated = deactivateAllFiles(prev);
+        return addFileToTree(deactivated, newFile)
+      });
+      setActiveFile(newFile);
+      router.push(`/editor/${newFile._id}`);
+      return newFile;
+    } catch (e) {
+      toast.error("An unexpected error occurred.");
+      return null;
     }
   };
 
-  const createFolder = async (name: string, parentId?: string) => {
+  const createFolder = async (name: string, parentId?: string): Promise<FileType | null> => {
+    const uniqueName = getUniqueName(name, parentId);
     try {
-        const res = await fetch("/api/files", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, isFolder: true, parentId }),
-          });
-          if (!res.ok) {
-            if (res.status === 409) {
-                const { error } = await res.json();
-                toast.error(error);
-            } else {
-                toast.error("Failed to create folder");
-            }
-            return null;
-          }
-          const newFolder = await res.json();
-          setFiles(prev => addFileToTree(prev, newFolder));
-          return newFolder;
-    } catch (e) {
-        toast.error("An unexpected error occurred.");
+      const res = await fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: uniqueName, isFolder: true, parentId }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json();
+        toast.error(error || "Failed to create folder");
         return null;
+      }
+      const newFolder = await res.json();
+      setFiles(prev => addFileToTree(prev, newFolder));
+      return newFolder;
+    } catch (e) {
+      toast.error("An unexpected error occurred.");
+      return null;
     }
   };
 
