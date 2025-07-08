@@ -2,6 +2,53 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { Octokit } from "octokit";
 
+const textFileExtensions = [
+    '.js', '.jsx', '.ts', '.tsx', '.json', '.css', '.scss', '.html', '.htm', 
+    '.md', '.txt', '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', 
+    '.php', '.rb', '.rs', '.sh', '.yml', '.yaml', '.xml', '.toml', '.ini',
+    '.env', '.babelrc', '.eslintrc', '.prettierrc', 'package.json', 'tsconfig.json'
+];
+
+async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, path: string = ''): Promise<{ path: string, content: string }[]> {
+    try {
+        const response = await octokit.rest.repos.getContent({ owner, repo, path });
+        const contents = response.data;
+
+        if (!Array.isArray(contents)) {
+            if (contents.type === 'file' && contents.content) {
+                return [{ path: contents.path, content: Buffer.from(contents.content, 'base64').toString('utf-8') }];
+            }
+            return [];
+        }
+
+        const files: { path: string, content: string }[] = [];
+        for (const item of contents) {
+            if (item.type === 'dir') {
+                const subFiles = await fetchRepoContents(octokit, owner, repo, item.path);
+                files.push(...subFiles);
+            } else if (item.type === 'file' && item.download_url && textFileExtensions.some(ext => item.name.endsWith(ext) || item.name.toLowerCase().includes(ext.slice(1)))) {
+                 try {
+                    const fileResponse = await fetch(item.download_url);
+                    if(fileResponse.ok) {
+                        const content = await fileResponse.text();
+                        files.push({ path: item.path, content });
+                    }
+                } catch (e) {
+                    console.warn(`Skipping file ${item.path} due to fetch error.`);
+                }
+            }
+        }
+        return files;
+    } catch (error: any) {
+        if (error.status === 404) {
+            console.warn(`Path not found: ${path}. Skipping.`);
+            return [];
+        }
+        throw error;
+    }
+}
+
+
 export async function GET(request: Request) {
   const session = await auth();
 
@@ -11,130 +58,28 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action");
+  const octokit = new Octokit({ auth: (session?.user as any).accessToken });
 
   try {
-    const octokit = new Octokit({ auth: (session?.user as any).accessToken });
-
     switch (action) {
-      case "getRepos":
-        const repos = await octokit.rest.repos.listForAuthenticatedUser({
-          sort: "updated",
-          per_page: 100,
-        });
-        return NextResponse.json(repos.data);
-      case "getRepoContent":
-        const owner = searchParams.get("owner")!;
-        const repo = searchParams.get("repo")!;
-        const path = searchParams.get("path") || "";
-        const content = await octokit.rest.repos.getContent({ owner, repo, path });
-        return NextResponse.json(content.data);
-      case "getBranches":
-        const branchOwner = searchParams.get("owner")!;
-        const branchRepo = searchParams.get("repo")!;
-        const branches = await octokit.rest.repos.listBranches({
-          owner: branchOwner,
-          repo: branchRepo,
-        });
-        return NextResponse.json(branches.data);
       case "getUser":
         const user = await octokit.rest.users.getAuthenticated();
         return NextResponse.json(user.data);
+      
+      case "getRepoTree":
+        const owner = searchParams.get("owner");
+        const repo = searchParams.get("repo");
+        if (!owner || !repo) {
+            return NextResponse.json({ error: "Missing owner or repo" }, { status: 400 });
+        }
+        const files = await fetchRepoContents(octokit, owner, repo);
+        return NextResponse.json(files);
+
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
   } catch (error: any) {
     console.error("GitHub GET Error:", error);
-    return NextResponse.json(
-      { error: error.message || "GitHub operation failed" },
-      { status: error.status || 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  const session = await auth();
-
-  if (!(session?.user as any)?.accessToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json();
-  const { action } = body;
-
-  try {
-    const octokit = new Octokit({ auth: (session?.user as any).accessToken });
-
-    switch (action) {
-      case "commitAndPush":
-        const { owner, repo, branch, message, files } = body;
-        const newBranchName = `feat/codeverse-commit-${Date.now()}`;
-
-        const baseBranch = await octokit.rest.repos.getBranch({ owner, repo, branch });
-        const baseSha = baseBranch.data.commit.sha;
-        
-        await octokit.rest.git.createRef({
-            owner,
-            repo,
-            ref: `refs/heads/${newBranchName}`,
-            sha: baseSha,
-        });
-        
-        const blobs = await Promise.all(
-            (files as { path: string, content: string }[]).map(file =>
-                octokit.rest.git.createBlob({
-                    owner,
-                    repo,
-                    content: Buffer.from(file.content, 'utf-8').toString('base64'),
-                    encoding: 'base64',
-                }).then(blob => ({
-                    path: file.path,
-                    mode: '100644' as const,
-                    type: 'blob' as const,
-                    sha: blob.data.sha,
-                }))
-            )
-        );
-        
-        const latestCommit = await octokit.rest.git.getCommit({ owner, repo, commit_sha: baseSha });
-
-        const tree = await octokit.rest.git.createTree({
-            owner,
-            repo,
-            base_tree: latestCommit.data.tree.sha,
-            tree: blobs,
-        });
-
-        const newCommit = await octokit.rest.git.createCommit({
-            owner,
-            repo,
-            message,
-            tree: tree.data.sha,
-            parents: [baseSha],
-        });
-        
-        await octokit.rest.git.updateRef({
-            owner,
-            repo,
-            ref: `heads/${newBranchName}`,
-            sha: newCommit.data.sha,
-        });
-
-        const pr = await octokit.rest.pulls.create({
-            owner,
-            repo,
-            title: message,
-            head: newBranchName,
-            base: branch,
-            body: 'Changes committed from CodeVerse.',
-        });
-        
-        return NextResponse.json({ success: true, prUrl: pr.data.html_url });
-      
-      default:
-        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-    }
-  } catch (error: any) {
-    console.error("GitHub POST Error:", error);
     return NextResponse.json(
       { error: error.message || "GitHub operation failed" },
       { status: error.status || 500 }

@@ -19,25 +19,6 @@ const findNodeInTree = (files: FileType[], fileId: string): FileType | null => {
   return null;
 };
 
-const findNodeByPath = (files: FileType[], path: string): FileType | null => {
-  const parts = path.split('/').filter(p => p);
-  let currentNode: FileType | null = null;
-  let currentChildren = files;
-
-  for (const part of parts) {
-    if (!currentChildren) return null;
-    const found = currentChildren.find(f => f.name === part);
-    if (found) {
-      currentNode = found;
-      currentChildren = found.children || [];
-    } else {
-      return null;
-    }
-  }
-  return currentNode;
-};
-
-
 const updateFileInTree = (files: FileType[], fileId: string, updates: Partial<FileType>): FileType[] => {
   return files.map(file => {
     if (file._id === fileId) {
@@ -99,14 +80,13 @@ const flattenFiles = (files: FileType[]): FileType[] => {
     return allFiles;
 }
 
-
 interface FileSystemState {
   files: FileType[];
+  originalFileContents: Record<string, string>; // For tracking dirty state
   activeFileId: string | null;
   expandedFolders: string[];
   loading: boolean;
   findFile: (fileId: string) => FileType | null;
-  findFileByPath: (path: string) => FileType | null;
   getPathForFile: (fileId: string) => string;
   createFile: (name: string, parentId?: string) => FileType;
   createFolder: (name: string, parentId?: string) => void;
@@ -117,41 +97,44 @@ interface FileSystemState {
   searchFiles: (query: string) => SearchResult[];
   replaceInFiles: (query: string, replaceWith: string) => { filesUpdated: number, replacements: number };
   reset: () => void;
+  setWorkspace: (clonedFiles: { path: string, content: string }[]) => void;
+  getDirtyFiles: () => FileType[];
+  commit: (message: string) => void;
 }
 
-const initialFiles: FileType[] = [
-    {
-        _id: 'welcome-file',
-        name: 'Welcome.md',
-        content: '# Welcome to CodeVerse!\n\nThis is a client-side IDE. All your files are saved in your browser\'s local storage.\n\nTo get started, create a new file or folder using the icons in the explorer.\n\nHappy coding!',
-        isFolder: false,
-        parentId: null,
-        language: 'markdown',
-        isOpen: true,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        children: []
-    }
-];
+const initialWelcomeFile: FileType = {
+    _id: 'welcome-file',
+    name: 'Welcome.md',
+    content: '# Welcome to CodeVerse!\n\nThis is a cloud-based IDE. Sign in and clone a GitHub repository to get started.\n\nHappy coding!',
+    isFolder: false,
+    parentId: null,
+    language: 'markdown',
+    isOpen: true,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    children: []
+};
+
+const initialState = {
+    files: [initialWelcomeFile],
+    originalFileContents: { 'welcome-file': initialWelcomeFile.content },
+    activeFileId: 'welcome-file',
+    expandedFolders: [],
+    loading: true,
+};
+
 
 export const useFileSystem = create<FileSystemState>()(
   persist(
     (set, get) => ({
-      files: initialFiles,
-      activeFileId: 'welcome-file',
-      expandedFolders: [],
-      loading: true, // Set to true initially, then false after mount
+      ...initialState,
       findFile: (fileId: string) => {
         if (!fileId) return null;
         return findNodeInTree(get().files, fileId);
       },
-      findFileByPath: (path: string) => {
-        return findNodeByPath(get().files, path);
-      },
       getPathForFile: (fileId: string): string => {
         const fileMap = new Map(flattenFiles(get().files).map(f => [f._id, f]));
-        
         const buildPath = (fId: string): string => {
             const file = fileMap.get(fId);
             if (!file) return '';
@@ -196,6 +179,7 @@ export const useFileSystem = create<FileSystemState>()(
         set(state => ({
             files: addFileToTree(deactivateAllFiles(state.files), newFile),
             activeFileId: newFile._id,
+            originalFileContents: { ...state.originalFileContents, [newFile._id]: newFile.content },
             expandedFolders: parentId ? [...new Set([...state.expandedFolders, parentId])] : state.expandedFolders
         }));
 
@@ -260,10 +244,15 @@ export const useFileSystem = create<FileSystemState>()(
             newActiveId = activeFileId;
         }
 
-        set(state => ({
-            files: deleteFileFromTree(state.files, fileId),
-            activeFileId: newActiveId
-        }));
+        set(state => {
+            const newOriginals = {...state.originalFileContents};
+            delete newOriginals[fileId];
+            return {
+                files: deleteFileFromTree(state.files, fileId),
+                activeFileId: newActiveId,
+                originalFileContents: newOriginals
+            };
+        });
         toast.success(`Deleted ${fileToDelete.name}`);
       },
       setActiveFileId: (fileId: string | null) => {
@@ -336,11 +325,113 @@ export const useFileSystem = create<FileSystemState>()(
         return { filesUpdated, replacements: totalReplacements };
       },
       reset: () => {
-        set({
-            files: initialFiles,
-            activeFileId: 'welcome-file',
-            expandedFolders: [],
+        set(initialState);
+      },
+      setWorkspace: (clonedFiles: { path: string, content: string }[]) => {
+        const newFiles: FileType[] = [];
+        const newOriginals: Record<string, string> = {};
+        const newExpanded: string[] = [];
+        const dirMap = new Map<string, FileType>();
+
+        clonedFiles.forEach(cf => {
+            const parts = cf.path.split('/');
+            let currentParentId: string | null = null;
+            let currentPath = '';
+
+            parts.forEach((part, index) => {
+                const isLastPart = index === parts.length - 1;
+                currentPath = currentPath ? `${currentPath}/${part}` : part;
+                
+                if (isLastPart) { // It's a file
+                    const newFile: FileType = {
+                        _id: uuidv4(),
+                        name: part,
+                        content: cf.content,
+                        isFolder: false,
+                        parentId: currentParentId,
+                        language: getLanguageConfigFromFilename(part).monacoLanguage,
+                        isOpen: false,
+                        isActive: false,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    };
+                    newOriginals[newFile._id] = cf.content;
+
+                    if (currentParentId) {
+                        const parent = dirMap.get(currentParentId);
+                        parent?.children?.push(newFile);
+                    } else {
+                        newFiles.push(newFile);
+                    }
+                } else { // It's a directory
+                    let dirNode = Array.from(dirMap.values()).find(d => d.name === part && d.parentId === currentParentId);
+                    if (!dirNode) {
+                        dirNode = {
+                            _id: uuidv4(),
+                            name: part,
+                            content: '',
+                            isFolder: true,
+                            parentId: currentParentId,
+                            language: 'plaintext',
+                            isOpen: false,
+                            isActive: false,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                            children: []
+                        };
+                        dirMap.set(dirNode._id, dirNode);
+                        newExpanded.push(dirNode._id);
+                        if (currentParentId) {
+                           const parent = dirMap.get(currentParentId);
+                           parent?.children?.push(dirNode);
+                        } else {
+                           newFiles.push(dirNode);
+                        }
+                    }
+                    currentParentId = dirNode._id;
+                }
+            });
         });
+
+        // Open the README if it exists, otherwise the first file.
+        const readme = flattenFiles(newFiles).find(f => f.name.toLowerCase() === 'readme.md');
+        const firstFile = flattenFiles(newFiles).find(f => !f.isFolder);
+        let activeId = null;
+        if (readme) {
+            readme.isOpen = true;
+            readme.isActive = true;
+            activeId = readme._id;
+        } else if (firstFile) {
+            firstFile.isOpen = true;
+            firstFile.isActive = true;
+            activeId = firstFile._id;
+        }
+        
+        set({ 
+            files: newFiles, 
+            originalFileContents: newOriginals, 
+            activeFileId: activeId, 
+            expandedFolders: newExpanded 
+        });
+      },
+      getDirtyFiles: () => {
+        const { files, originalFileContents } = get();
+        return flattenFiles(files).filter(file =>
+            !file.isFolder &&
+            originalFileContents.hasOwnProperty(file._id) &&
+            file.content !== originalFileContents[file._id]
+        );
+      },
+      commit: (message: string) => {
+        const { files, originalFileContents } = get();
+        const newOriginals = { ...originalFileContents };
+        const dirtyFiles = flattenFiles(files).filter(f => !f.isFolder && f.content !== newOriginals[f._id]);
+        
+        dirtyFiles.forEach(file => {
+            newOriginals[file._id] = file.content;
+        });
+
+        set({ originalFileContents: newOriginals });
       }
     }),
     {

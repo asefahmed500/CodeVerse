@@ -12,6 +12,7 @@ import { Label } from '../ui/label'
 import { toast } from 'sonner'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { useTerminalManager } from '@/hooks/use-terminal-manager-store'
+import { UserButton } from '@/components/auth/user-button'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +22,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 export function SettingsView() {
@@ -49,7 +49,6 @@ export function SettingsView() {
     resetTerminals();
     setResetAlertOpen(false);
     toast.success("Workspace has been reset.");
-    // Optional: reload to ensure a clean state
     setTimeout(() => window.location.reload(), 500);
   }
 
@@ -61,6 +60,14 @@ export function SettingsView() {
       </div>
       <div className="p-4 space-y-8 flex-1 overflow-y-auto">
         
+        <div className='space-y-4'>
+          <h3 className="text-sm font-medium text-muted-foreground">Account</h3>
+           <div className='flex items-center justify-between'>
+              <Label className='text-sm'>GitHub Account</Label>
+              <UserButton />
+            </div>
+        </div>
+
         <div className='space-y-4'>
           <h3 className="text-sm font-medium text-muted-foreground">Appearance</h3>
           <div className='flex items-center justify-between'>

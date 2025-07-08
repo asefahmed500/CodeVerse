@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useActiveView } from "@/hooks/use-active-view";
 import {
@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { activityItems } from "@/config/views";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import { UserButton } from "../auth/user-button";
 
 export function ActivityBar() {
   const { activeView, setActiveView } = useActiveView();
@@ -37,18 +37,7 @@ export function ActivityBar() {
         </div>
 
         <div className="flex flex-col items-center gap-2">
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="w-10 h-10 rounded-lg">
-                        <Avatar className="h-8 w-8">
-                            <AvatarFallback>U</AvatarFallback>
-                        </Avatar>
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                    User Account
-                </TooltipContent>
-            </Tooltip>
+            <UserButton />
             <Tooltip>
                 <TooltipTrigger asChild>
                 <Button
