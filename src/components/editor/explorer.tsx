@@ -254,16 +254,11 @@ function FileTreeItem({
   const handleDelete = async (e: Event) => {
     e.preventDefault();
     const wasActive = activeFileId === file._id;
-
-    await deleteFile(file._id);
+    const { nextActiveFileId } = await deleteFile(file._id);
     
     if (wasActive) {
-      const { allFiles } = useFileSystem.getState();
-      const openFiles = allFiles.filter(f => !f.isFolder && f.isOpen);
-      
-      if (openFiles.length > 0) {
-        openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        router.replace(`/editor/${openFiles[0]._id}`);
+      if (nextActiveFileId) {
+        router.replace(`/editor/${nextActiveFileId}`);
       } else {
         router.replace('/editor');
       }
