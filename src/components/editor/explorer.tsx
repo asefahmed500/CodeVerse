@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ChevronRight, FolderPlus, FilePlus, RefreshCw, X, Pencil } from "lucide-react";
@@ -141,8 +142,22 @@ function FileTreeItem({
 
   const handleDelete = async (e: Event) => {
     e.preventDefault();
+    const wasActive = activeFileId === file._id;
+
     await deleteFile(file._id);
-  }
+    
+    if (wasActive) {
+      const { allFiles } = useFileSystem.getState();
+      const openFiles = allFiles.filter(f => !f.isFolder && f.isOpen);
+      
+      if (openFiles.length > 0) {
+        openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        router.replace(`/editor/${openFiles[0]._id}`);
+      } else {
+        router.replace('/editor');
+      }
+    }
+  };
 
   const handleRenameClick = (e: Event) => {
     e.preventDefault();
