@@ -5,6 +5,7 @@ import { StatusBar } from "@/components/editor/status-bar";
 import { TitleBar } from "@/components/editor/title-bar";
 import { FileSystemProvider } from "@/hooks/use-file-system";
 import { EditorTabs } from "@/components/editor/editor-tabs";
+import { MobileSidebar } from "@/components/editor/mobile-sidebar";
 
 export default async function EditorLayout({
   children,
@@ -15,6 +16,7 @@ export default async function EditorLayout({
 
   return (
     <FileSystemProvider>
+      <MobileSidebar />
       <div className="flex flex-col h-screen bg-[#1e1e1e] text-[#cccccc] overflow-hidden">
         <TitleBar session={session} />
         <div className="flex flex-1 overflow-hidden">

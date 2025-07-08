@@ -65,16 +65,16 @@ export default function EditorFilePage() {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="flex-1">
-      <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="bg-card">
+      <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="bg-card hidden md:block">
         <SidebarView />
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      <ResizableHandle withHandle className="hidden md:flex" />
       <ResizablePanel defaultSize={80}>
         {activeFile && !activeFile.isFolder ? (
           <CodeEditor file={activeFile} key={activeFile._id} />
         ) : (
           <div className="flex items-center justify-center h-full bg-background">
-            <div className="text-center">
+            <div className="text-center p-4">
               <h3 className="text-lg font-medium text-foreground">
                 Welcome to CodeVerse
               </h3>

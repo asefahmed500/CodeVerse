@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Files,
-  Search,
-  Github,
-  Terminal,
-  Settings,
-  User,
-} from "lucide-react";
+import { User, Settings } from "lucide-react";
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { Button } from "@/components/ui/button";
 import { useActiveView } from "@/hooks/use-active-view";
@@ -18,21 +11,17 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-
-const activityItems = [
-    { view: "explorer", icon: Files, tooltip: "Explorer (Ctrl+Shift+E)" },
-    { view: "search", icon: Search, tooltip: "Search (Ctrl+Shift+F)" },
-    { view: "github", icon: Github, tooltip: "Source Control (Ctrl+Shift+G)" },
-] as const;
-
+import { activityItems, settingsItem } from "@/config/views";
 
 export function ActivityBar() {
   const { activeView, setActiveView } = useActiveView();
   const { data: session } = useSession();
 
+  const allItems = [...activityItems, ...settingsItem];
+
   return (
     <TooltipProvider>
-      <div className="flex flex-col items-center justify-between w-12 h-full bg-[#333333] border-r border-[#252526] py-2">
+      <div className="hidden md:flex flex-col items-center justify-between w-12 h-full bg-[#333333] border-r border-[#252526] py-2">
         <div className="flex flex-col items-center gap-2">
             {activityItems.map((item) => (
                 <Tooltip key={item.view}>
