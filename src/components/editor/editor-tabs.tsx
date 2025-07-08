@@ -4,7 +4,6 @@ import { X } from 'lucide-react'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { useRouter } from 'next/navigation'
 import type { FileType } from '@/types'
-import { getLanguageFromFilename } from '@/config/languages'
 import { FileIcon } from './file-icon'
 
 export function EditorTabs() {
@@ -41,14 +40,14 @@ export function EditorTabs() {
     }
   }
 
-  if (openFiles.length === 0) return <div className="h-[36px] bg-[#252526] border-b border-[#1e1e1e]"></div>
+  if (openFiles.length === 0) return <div className="h-[36px] bg-muted border-b border-background"></div>
 
   return (
-    <div className="flex items-center bg-[#252526] border-b border-[#1e1e1e]">
+    <div className="flex items-center bg-muted border-b border-background">
       {openFiles.map((file) => (
         <div
           key={file._id}
-          className={`flex items-center px-3 h-[36px] text-sm border-r border-[#1e1e1e] cursor-pointer group ${activeFile?._id === file._id ? 'bg-[#1e1e1e] text-white' : 'bg-[#2d2d2d] text-[#9e9e9e] hover:bg-[#1e1e1e]'}`}
+          className={`flex items-center px-3 h-[36px] text-sm border-r border-background cursor-pointer group ${activeFile?._id === file._id ? 'bg-background text-foreground' : 'bg-secondary text-muted-foreground hover:bg-background'}`}
           onClick={() => {
             setActiveFile(file)
             router.push(`/editor/${file._id}`)
@@ -57,7 +56,7 @@ export function EditorTabs() {
           <FileIcon filename={file.name} className="h-4 w-4 mr-2" />
           <span className="mr-2">{file.name}</span>
           <button
-            className={`p-1 rounded-full text-[#9e9e9e] hover:bg-[#3a3d41] hover:text-white ${activeFile?._id === file._id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            className={`p-1 rounded-full text-muted-foreground hover:bg-card hover:text-foreground ${activeFile?._id === file._id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
             onClick={(e) => handleCloseTab(e, file)}
           >
             <X className="h-3 w-3" />

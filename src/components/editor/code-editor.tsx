@@ -10,12 +10,14 @@ import { getLanguageConfigFromFilename } from "@/config/languages";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { debounce } from "@/lib/utils";
 import { useEditorStore } from "@/hooks/use-editor-store";
+import { useEditorSettingsStore } from "@/hooks/use-editor-settings-store";
 
 export function CodeEditor({ file }: { file: FileType }) {
   const { theme } = useTheme();
   const [content, setContent] = useState(file.content);
   const { updateFile } = useFileSystem();
   const { setEditor, setSaveHandler, setCursorPosition } = useEditorStore();
+  const { fontSize, tabSize, wordWrap, minimap } = useEditorSettingsStore();
 
   useEffect(() => {
     setContent(file.content);
@@ -30,7 +32,6 @@ export function CodeEditor({ file }: { file: FileType }) {
     }
   }, [file._id, file.name, updateFile]);
   
-  // Debounced save for auto-saving on change
   const debouncedSave = useCallback(debounce(immediateSave, 2000), [immediateSave]);
 
   const handleEditorChange: OnChange = (value) => {
@@ -40,7 +41,6 @@ export function CodeEditor({ file }: { file: FileType }) {
   };
   
   useEffect(() => {
-    // Register the immediate save function for external triggers (e.g., menu bar)
     setSaveHandler(() => immediateSave);
     return () => {
       setSaveHandler(null);
@@ -48,7 +48,6 @@ export function CodeEditor({ file }: { file: FileType }) {
   }, [immediateSave, setSaveHandler]);
 
   useEffect(() => {
-    // Cleanup editor instance and cursor position on unmount
     return () => {
       setEditor(null);
       setCursorPosition(null);
@@ -71,11 +70,21 @@ export function CodeEditor({ file }: { file: FileType }) {
     editor.focus();
   };
 
-
   const languageConfig = getLanguageConfigFromFilename(file.name);
 
+  const editorOptions = {
+    ...EDITOR_CONFIG,
+    fontSize,
+    tabSize,
+    wordWrap,
+    minimap: {
+      ...EDITOR_CONFIG.minimap,
+      enabled: minimap,
+    },
+  };
+
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e]">
+    <div className="h-full flex flex-col bg-background">
       <div className="flex-1">
         <Editor
           height="100%"
@@ -84,7 +93,7 @@ export function CodeEditor({ file }: { file: FileType }) {
           theme={theme === "dark" ? "vs-dark" : "light"}
           value={content}
           onChange={handleEditorChange}
-          options={EDITOR_CONFIG}
+          options={editorOptions}
           onMount={handleEditorMount}
         />
       </div>

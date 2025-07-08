@@ -16,7 +16,7 @@ export function CommandPalette() {
   const { isOpen: open, setOpen } = useCommandPaletteStore();
   const router = useRouter()
   const { files, createFile, createFolder } = useFileSystem()
-  const { setActiveView } = useActiveView()
+  const { setActiveView, openView } = useActiveView()
   const { setTheme } = useTheme()
 
   const runCommand = (command: () => void) => {
@@ -49,7 +49,7 @@ export function CommandPalette() {
                 No results found
               </CommandPrimitive.Empty>
 
-              <CommandPrimitive.Group heading="File" className="text-muted-foreground pt-2">
+              <CommandPrimitive.Group heading="General" className="text-muted-foreground pt-2">
                 <CommandPrimitive.Item 
                   onSelect={() => runCommand(() => createFile('Untitled'))}
                   className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground"
@@ -64,6 +64,15 @@ export function CommandPalette() {
                   <FolderPlus className="w-4 h-4 mr-2" />
                   New Folder
                 </CommandPrimitive.Item>
+                 <CommandPrimitive.Item 
+                  onSelect={() => runCommand(() => setTheme((prev) => prev === 'dark' ? 'light' : 'dark'))}
+                  className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Toggle Color Theme
+                </CommandPrimitive.Item>
+                <CommandPrimitive.Item onSelect={() => runCommand(() => openView('settings'))} className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground">
+                  <Settings className="w-4 h-4 mr-2" /> Open Settings
+                </CommandPrimitive.Item>
               </CommandPrimitive.Group>
 
               <CommandPrimitive.Group heading="View" className="text-muted-foreground pt-2">
@@ -76,17 +85,8 @@ export function CommandPalette() {
                 <CommandPrimitive.Item onSelect={() => runCommand(() => setActiveView('github'))} className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground">
                   <Github className="w-4 h-4 mr-2" /> Show Source Control
                 </CommandPrimitive.Item>
-                <CommandPrimitive.Item onSelect={() => runCommand(() => setActiveView('terminal'))} className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground">
+                <CommandPrimitive.Item onSelect={() => runCommand(() => openView('terminal'))} className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground">
                   <TerminalSquare className="w-4 h-4 mr-2" /> Show Terminal
-                </CommandPrimitive.Item>
-              </CommandPrimitive.Group>
-
-              <CommandPrimitive.Group heading="Preferences" className="text-muted-foreground pt-2">
-                <CommandPrimitive.Item 
-                  onSelect={() => runCommand(() => setTheme((prev) => prev === 'dark' ? 'light' : 'dark'))}
-                  className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Toggle Color Theme
                 </CommandPrimitive.Item>
               </CommandPrimitive.Group>
               

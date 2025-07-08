@@ -17,11 +17,9 @@ export function ActivityBar() {
   const { activeView, setActiveView } = useActiveView();
   const { data: session } = useSession();
 
-  const allItems = [...activityItems, ...settingsItem];
-
   return (
     <TooltipProvider>
-      <div className="hidden md:flex flex-col items-center justify-between w-12 h-full bg-[#333333] border-r border-[#252526] py-2">
+      <div className="hidden md:flex flex-col items-center justify-between w-12 h-full bg-card border-r border-border py-2">
         <div className="flex flex-col items-center gap-2">
             {activityItems.map((item) => (
                 <Tooltip key={item.view}>
@@ -29,7 +27,7 @@ export function ActivityBar() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className={`w-10 h-10 rounded-lg ${activeView === item.view ? "text-white bg-[#2a2d2e]" : "text-[#858585] hover:bg-[#2a2d2e] hover:text-white"}`}
+                        className={`w-10 h-10 rounded-lg ${activeView === item.view ? "text-foreground bg-secondary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
                         onClick={() => setActiveView(item.view)}
                     >
                         <item.icon className="h-6 w-6" />
@@ -51,7 +49,7 @@ export function ActivityBar() {
                         </Avatar>
                     </Button>
                 ) : (
-                    <Button onClick={() => signIn('github')} variant="ghost" size="icon" className="w-10 h-10 rounded-lg text-[#858585] hover:bg-[#2a2d2e] hover:text-white">
+                    <Button onClick={() => signIn('github')} variant="ghost" size="icon" className="w-10 h-10 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground">
                         <User className="h-6 w-6" />
                     </Button>
                 )}
@@ -65,7 +63,7 @@ export function ActivityBar() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className={`w-10 h-10 rounded-lg ${activeView === "settings" ? "text-white bg-[#2a2d2e]" : "text-[#858585] hover:bg-[#2a2d2e] hover:text-white"}`}
+                    className={`w-10 h-10 rounded-lg ${activeView === "settings" ? "text-foreground bg-secondary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
                     onClick={() => setActiveView("settings")}
                 >
                     <Settings className="h-6 w-6" />
