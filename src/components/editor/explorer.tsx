@@ -51,7 +51,6 @@ function FileTree() {
   const { files, updateFile, loading, expandedFolders, toggleFolder } = useFileSystem();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
-  const [isProjectExpanded, setIsProjectExpanded] = useState(true);
 
   const handleRename = async (file: FileType) => {
     if (!editingValue.trim() || editingValue === file.name) {
@@ -85,16 +84,11 @@ function FileTree() {
 
   return (
     <div className="flex-1 overflow-y-auto p-1">
-      <div 
-        className="flex items-center p-1 cursor-pointer"
-        onClick={() => setIsProjectExpanded(!isProjectExpanded)}
-      >
-          {isProjectExpanded ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
+      <div className="flex items-center p-1">
+          <ChevronDown size={16}/>
           <span className="font-bold text-sm ml-1 uppercase">CodeVerse</span>
       </div>
-      {isProjectExpanded && (
-        loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))
-      )}
+      {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}
     </div>
   );
 }
@@ -129,7 +123,7 @@ function FileTreeItem({
 
   const handleItemClick = (e: React.MouseEvent) => {
     if (isEditing) return;
-    if(e.detail === 2 && !file.isFolder){ // Double click to open
+    if(e.detail === 2 && !file.isFolder){
       router.push(`/editor/${file._id}`);
       setActiveFile(file);
     } else if (file.isFolder) {
@@ -148,7 +142,7 @@ function FileTreeItem({
           className={`flex items-center py-1 px-2 rounded hover:bg-accent cursor-pointer group ${activeFile?._id === file._id ? "bg-muted" : ""}`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={handleItemClick}
-          onContextMenu={(e) => e.currentTarget.focus()} // Focus for dropdown trigger
+          onContextMenu={(e) => e.currentTarget.focus()}
         >
           {file.isFolder ? (
             isExpanded ? <ChevronDown size={16} className="mr-1" /> : <ChevronRight size={16} className="mr-1" />
