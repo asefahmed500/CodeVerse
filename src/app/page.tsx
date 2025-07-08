@@ -11,7 +11,7 @@ export default function Home() {
         <p className="text-xl text-muted-foreground">
           Your personal, cloud-native IDE.
         </p>
-        <Link href="/signin">
+        <Link href="/signup">
           <Button size="lg" className="mt-4">
             Go to IDE
           </Button>
