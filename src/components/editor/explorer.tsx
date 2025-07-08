@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil } from "lucide-react";
-import React, { useState } from "react";
+import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil, Folder } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useRouter } from "next/navigation";
 import type { FileType } from "@/types";
@@ -18,23 +18,96 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
+import { getLanguageConfigFromFilename } from "@/config/languages";
+
+function CreationInput({
+  type,
+  parentId,
+  depth,
+  onComplete,
+}: {
+  type: 'file' | 'folder';
+  parentId: string | null;
+  depth: number;
+  onComplete: () => void;
+}) {
+  const { createFile, createFolder } = useFileSystem();
+  const [name, setName] = useState('');
+  const router = useRouter();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      onComplete();
+      return;
+    }
+
+    if (type === 'file') {
+      const newFile = await createFile(name, parentId);
+      if (newFile) {
+        router.push(`/editor/${newFile._id}`);
+      }
+    } else {
+      await createFolder(name, parentId);
+    }
+    onComplete();
+  };
+
+  return (
+    <div
+      style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      className="flex items-center py-1 px-2"
+    >
+      <div className="flex items-center w-full">
+        {type === 'folder' ? (
+            <ChevronRight size={16} className="mr-1 invisible" />
+          ) : <div className="w-4 mr-1" />
+        }
+        {type === 'file' ? (
+          <FileIcon filename={name} className="mr-2" />
+        ) : (
+          <Folder size={16} className="mr-2" />
+        )}
+        <Input
+          ref={inputRef}
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={handleCreate}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate();
+            if (e.key === 'Escape') onComplete();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="h-6 text-sm bg-background border-primary"
+        />
+      </div>
+    </div>
+  );
+}
 
 export function Explorer() {
   const { activeView } = useActiveView();
-  const { createFile, createFolder } = useFileSystem();
-  const router = useRouter();
+  const [creating, setCreating] = useState<{ type: 'file' | 'folder'; parentId: string | null } | null>(null);
+  const { toggleFolder, expandedFolders } = useFileSystem();
 
   if (activeView !== "explorer") {
     return null;
   }
   
-  const handleNewFile = async () => {
-    const newFile = await createFile('Untitled.js');
-    if (newFile) router.push(`/editor/${newFile._id}`);
+  const handleStartCreation = (type: 'file' | 'folder', parentId: string | null) => {
+    if (parentId && !expandedFolders.includes(parentId)) {
+      toggleFolder(parentId);
+    }
+    setCreating({ type, parentId });
   };
 
-  const handleNewFolder = () => {
-    createFolder('New Folder');
+  const handleCreationComplete = () => {
+    setCreating(null);
   };
 
   return (
@@ -42,30 +115,51 @@ export function Explorer() {
         <div className="p-2 border-b border-border flex items-center justify-between group">
         <h3 className="font-bold text-sm uppercase">Explorer</h3>
         <div className="flex items-center">
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleNewFile}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStartCreation('file', null)}>
             <FilePlus size={16}/>
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleNewFolder}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStartCreation('folder', null)}>
             <FolderPlus size={16}/>
             </Button>
         </div>
         </div>
-        <FileTree />
+        <FileTree
+          creating={creating}
+          onStartCreation={handleStartCreation}
+          onCreationComplete={handleCreationComplete}
+        />
     </div>
   );
 }
 
-function FileTree() {
+function FileTree({ creating, onStartCreation, onCreationComplete }: {
+  creating: { type: 'file' | 'folder'; parentId: string | null } | null;
+  onStartCreation: (type: 'file' | 'folder', parentId: string | null) => void;
+  onCreationComplete: () => void;
+}) {
   const { files, loading, expandedFolders } = useFileSystem();
 
   const renderFile = (file: FileType, depth: number) => (
-    <FileTreeItem
-      key={file._id}
-      file={file}
-      depth={depth}
-    >
-      {file.isFolder && expandedFolders.includes(file._id) && file.children?.map(child => renderFile(child, depth + 1))}
-    </FileTreeItem>
+    <React.Fragment key={file._id}>
+      <FileTreeItem
+        file={file}
+        depth={depth}
+        onStartCreation={onStartCreation}
+      />
+      {file.isFolder && expandedFolders.includes(file._id) && (
+        <>
+          {file.children?.map(child => renderFile(child, depth + 1))}
+          {creating && creating.parentId === file._id && (
+            <CreationInput
+              type={creating.type}
+              parentId={file._id}
+              depth={depth + 1}
+              onComplete={onCreationComplete}
+            />
+          )}
+        </>
+      )}
+    </React.Fragment>
   );
 
   return (
@@ -77,6 +171,14 @@ function FileTree() {
         </CollapsibleTrigger>
         <CollapsibleContent>
             {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}
+            {creating && creating.parentId === null && (
+              <CreationInput
+                type={creating.type}
+                parentId={null}
+                depth={0}
+                onComplete={onCreationComplete}
+              />
+            )}
         </CollapsibleContent>
       </Collapsible>
     </div>
@@ -86,14 +188,14 @@ function FileTree() {
 function FileTreeItem({
   file,
   depth,
-  children,
+  onStartCreation,
 }: {
   file: FileType;
   depth: number;
-  children: React.ReactNode;
+  onStartCreation: (type: 'file' | 'folder', parentId: string | null) => void;
 }) {
   const router = useRouter();
-  const { activeFileId, setActiveFileId, toggleFolder, expandedFolders, deleteFile, updateFile, createFile, createFolder, duplicateFileOrFolder } = useFileSystem();
+  const { activeFileId, setActiveFileId, toggleFolder, expandedFolders, deleteFile, updateFile, duplicateFileOrFolder } = useFileSystem();
   const [isEditing, setIsEditing] = useState(false);
   const [editingValue, setEditingValue] = useState(file.name);
 
@@ -121,27 +223,32 @@ function FileTreeItem({
   const handleRename = async () => {
     if (!editingValue.trim() || editingValue === file.name) {
         setIsEditing(false);
+        setEditingValue(file.name);
         return;
     }
     await updateFile(file._id, { name: editingValue });
     toast.success(`Renamed to ${editingValue}`);
     setIsEditing(false);
   };
+  
+  const handleCancelRename = () => {
+    setIsEditing(false);
+    setEditingValue(file.name);
+  }
 
   const handleDuplicate = async (e: Event) => {
     e.preventDefault();
     await duplicateFileOrFolder(file._id);
   }
   
-  const handleNewFile = async (e: Event) => {
+  const handleNewFile = (e: Event) => {
     e.preventDefault();
-    const newFile = await createFile('Untitled.js', file._id);
-    if(newFile) router.push(`/editor/${newFile._id}`);
+    onStartCreation('file', file._id);
   }
   
-  const handleNewFolder = async (e: Event) => {
+  const handleNewFolder = (e: Event) => {
     e.preventDefault();
-    await createFolder('New Folder', file._id);
+    onStartCreation('folder', file._id);
   }
 
   const handleDelete = async (e: Event) => {
@@ -183,8 +290,10 @@ function FileTreeItem({
           {file.isFolder ? (
             <ChevronRight size={16} className={`mr-1 transition-transform transform ${isExpanded ? 'rotate-90' : ''}`} />
           ) : <div className="w-4 mr-1" />}
-          <FileIcon filename={file.name} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
+          
           {isEditing ? (
+             <div className="flex items-center w-full">
+              <FileIcon filename={editingValue} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
               <Input 
                   type="text"
                   value={editingValue}
@@ -192,14 +301,18 @@ function FileTreeItem({
                   onBlur={handleRename}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleRename();
-                    if (e.key === 'Escape') setIsEditing(false);
+                    if (e.key === 'Escape') handleCancelRename();
                   }}
                   onClick={(e) => e.stopPropagation()}
                   autoFocus
                   className="h-6 text-sm bg-background border-primary"
               />
+            </div>
           ) : (
+             <>
+              <FileIcon filename={file.name} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
               <span className="truncate text-sm">{file.name}</span>
+            </>
           )}
         </div>
       <DropdownMenuContent className="w-48" align="start">
@@ -230,7 +343,6 @@ function FileTreeItem({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {children}
     </div>
   );
 }

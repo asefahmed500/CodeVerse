@@ -156,6 +156,10 @@ const useFileSystemStore = create<FileSystemState>()(
         const files = produce(get().files, draft => {
             const file = getFlatFiles(draft).find(f => f._id === fileId);
             if (file) {
+                // If name is being updated, also update the language property for consistency
+                if (updates.name && updates.name !== file.name) {
+                    updates.language = getLanguageConfigFromFilename(updates.name).monacoLanguage;
+                }
                 Object.assign(file, updates, { updatedAt: new Date() });
             }
         });
