@@ -33,7 +33,8 @@ export function CodeEditor({ file }: { file: FileType }) {
 
   const handleEditorChange: OnChange = (value) => {
     const newContent = value || "";
-    file.content = newContent;
+    // Optimistically update local file object to avoid re-fetch
+    file.content = newContent; 
     debouncedSave(newContent);
   };
   

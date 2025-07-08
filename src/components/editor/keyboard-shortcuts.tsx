@@ -22,7 +22,7 @@ function toggleFullScreen() {
 
 export function KeyboardShortcuts() {
   const { toggle: toggleCommandPalette } = useCommandPaletteStore();
-  const { activeView, setActiveView } = useActiveView();
+  const { activeView, setActiveView, openView } = useActiveView();
   const { toggle: toggleSidebar } = useSidebarStore();
   const { toggle: togglePanel } = usePanelStore();
 
@@ -31,39 +31,46 @@ export function KeyboardShortcuts() {
       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
       const isCtrlCmd = isMac ? e.metaKey : e.ctrlKey;
 
+      // Command Palette
       if (isCtrlCmd && e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
         toggleCommandPalette();
         return;
       }
 
+      // Quick Open (also opens command palette for now)
       if (isCtrlCmd && !e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
         toggleCommandPalette();
         return;
       }
-
+      
+      // Open Settings
       if (isCtrlCmd && e.key === ",") {
         e.preventDefault();
-        setActiveView("settings");
+        openView("settings");
         return;
       }
 
+      // Toggle Sidebar
       if (isCtrlCmd && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggleSidebar();
         return;
       }
 
+      // Toggle Terminal
       if (isCtrlCmd && e.key === "`") {
         e.preventDefault();
-        // This shortcut simply toggles the 'terminal' view on/off.
-        // The Panel component has a useEffect that will then show/hide the panel.
         setActiveView(activeView === "terminal" ? null : "terminal");
         return;
       }
 
-      if (e.key === "F11") {
+      // Toggle Full Screen
+      const isF11 = e.key === "F11";
+      const isMacFullScreen = isCtrlCmd && isMac && e.key.toLowerCase() === 'f';
+
+      if (isF11 || isMacFullScreen) {
         e.preventDefault();
         toggleFullScreen();
         return;
@@ -75,6 +82,7 @@ export function KeyboardShortcuts() {
   }, [
     activeView,
     setActiveView,
+    openView,
     toggleCommandPalette,
     toggleSidebar,
     togglePanel,

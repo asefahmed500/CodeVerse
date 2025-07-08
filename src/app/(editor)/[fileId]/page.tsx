@@ -31,33 +31,25 @@ export default function EditorFilePage() {
   const { updateFile, findFile, loading } = useFileSystem();
   const { isCollapsed, setCollapsed } = useSidebarStore();
 
-  // The primary source of truth for what to render is the fileId from the URL.
   const fileToRender = findFile(fileId);
 
   useEffect(() => {
-    // Wait for the file system to be ready.
     if (loading) return;
     
-    // Once loaded, check if the file from the URL exists.
     if (fileToRender) {
-      // If it's a folder, we can't edit it, so redirect to the welcome screen.
       if (fileToRender.isFolder) {
         router.replace('/editor');
         return;
       }
       
-      // If it's a valid file, ensure the global state reflects that it's open and active.
-      // This keeps the UI (like tabs and explorer highlights) in sync.
       if (!fileToRender.isOpen || !fileToRender.isActive) {
         updateFile(fileId, { isOpen: true, isActive: true });
       }
     } else {
-      // If the file doesn't exist at all, redirect to the welcome screen.
       router.replace('/editor');
     }
   }, [fileId, fileToRender, loading, router, updateFile]);
 
-  // The loading screen is shown until the file system is loaded and we have a valid file to display.
   if (loading || !fileToRender || fileToRender.isFolder) {
     return (
       <div className="flex items-center justify-center flex-1 h-full bg-background">

@@ -15,7 +15,7 @@ import { useCommandPaletteStore } from '@/hooks/use-command-palette-store'
 export function CommandPalette() {
   const { isOpen: open, setOpen } = useCommandPaletteStore();
   const router = useRouter()
-  const { files, createFile, createFolder } = useFileSystem()
+  const { allFiles, createFile, createFolder } = useFileSystem()
   const { setActiveView, openView } = useActiveView()
   const { setTheme } = useTheme()
 
@@ -24,15 +24,7 @@ export function CommandPalette() {
     command()
   }
 
-  const allFiles = useMemo(() => {
-    const collected: FileType[] = [];
-    const collectFiles = (f: FileType) => {
-        if (!f.isFolder) collected.push(f)
-        if (f.isFolder && f.children) f.children.forEach(collectFiles)
-    }
-    files.forEach(collectFiles)
-    return collected;
-  }, [files]);
+  const fileList = useMemo(() => allFiles.filter(f => !f.isFolder), [allFiles]);
 
   return (
     <>
@@ -51,8 +43,8 @@ export function CommandPalette() {
 
               <CommandPrimitive.Group heading="General" className="text-muted-foreground pt-2">
                 <CommandPrimitive.Item 
-                  onSelect={() => runCommand(() => {
-                    const newFile = createFile('Untitled.js');
+                  onSelect={() => runCommand(async () => {
+                    const newFile = await createFile('Untitled.js');
                     if(newFile) router.push(`/editor/${newFile._id}`);
                   })}
                   className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground"
@@ -94,7 +86,7 @@ export function CommandPalette() {
               </CommandPrimitive.Group>
               
               <CommandPrimitive.Group heading="Go to File" className="text-muted-foreground pt-2">
-                {allFiles.slice(0, 10).map((file) => (
+                {fileList.slice(0, 10).map((file) => (
                   <CommandPrimitive.Item 
                     key={file._id}
                     onSelect={() => runCommand(() => router.push(`/editor/${file._id}`))}

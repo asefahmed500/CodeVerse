@@ -12,7 +12,7 @@ export default function NewFilePage() {
     if (loading) return;
 
     const createNewUntitledFile = async () => {
-      const newFile = createFile("Untitled.js");
+      const newFile = await createFile("Untitled.js");
       if (newFile) {
         router.replace(`/editor/${newFile._id}`);
       } else {
