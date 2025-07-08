@@ -22,7 +22,10 @@ const buildTree = (files: any[]): FileType[] => {
 
     fileMap.forEach(file => {
         if (file.parentId && fileMap.has(file.parentId)) {
-            fileMap.get(file.parentId).children.push(file);
+            const parent = fileMap.get(file.parentId);
+            if (parent) {
+                parent.children.push(file);
+            }
         } else {
             tree.push(file);
         }
@@ -78,7 +81,7 @@ export async function POST(request: Request) {
                     _id: newId,
                     userId,
                     parentId,
-                    name: node.name, // The frontend will determine the "copy" name
+                    name: node.name,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 };
@@ -164,6 +167,10 @@ export async function PUT(request: Request) {
         const updates = await request.json();
         // Ensure updatedAt is set
         updates.updatedAt = new Date();
+
+        // The client manages these, so don't let them be overwritten
+        delete updates.isOpen;
+        delete updates.isActive;
 
         const updatedFile = await File.findOneAndUpdate(
             { _id: fileId, userId },
