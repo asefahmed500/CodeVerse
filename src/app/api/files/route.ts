@@ -43,16 +43,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { name, isFolder, parentId, language } = await request.json()
+  const { name, isFolder, parentId, language, isOpen } = await request.json()
+  const userId = (session.user as any).id;
 
   try {
+    const existingFile = await File.findOne({
+      name,
+      parentId: parentId || null,
+      userId,
+    });
+
+    if (existingFile) {
+      return NextResponse.json(
+        { error: `A ${existingFile.isFolder ? 'folder' : 'file'} with the name "${name}" already exists.` }, 
+        { status: 409 }
+      );
+    }
+
     const newFile = new File({
       name,
       isFolder,
       parentId: parentId || null,
-      userId: (session.user as any).id,
+      userId,
       language: isFolder ? undefined : (language || "plaintext"),
-      isActive: !isFolder
+      isActive: !isFolder,
+      isOpen: isFolder ? false : isOpen,
     })
 
     await newFile.save()
@@ -66,7 +81,7 @@ export async function POST(request: Request) {
     if (!isFolder) {
       await File.updateMany(
         { 
-          userId: (session.user as any).id,
+          userId,
           isActive: true,
           _id: { $ne: newFile._id }
         },
@@ -93,8 +108,31 @@ export async function PUT(request: Request) {
   }
 
   const { fileId, content, name, isOpen, isActive } = await request.json()
+  const userId = (session.user as any).id;
 
   try {
+    const fileToUpdate = await File.findById(fileId);
+    if (!fileToUpdate) {
+        return NextResponse.json({ error: "File not found" }, { status: 404 });
+    }
+
+    // If renaming, check for conflicts first
+    if (name !== undefined && name !== fileToUpdate.name) {
+      const existingFile = await File.findOne({
+        name,
+        parentId: fileToUpdate.parentId,
+        userId: userId,
+        _id: { $ne: fileId }
+      });
+  
+      if (existingFile) {
+        return NextResponse.json(
+          { error: `A ${existingFile.isFolder ? 'folder' : 'file'} with the name "${name}" already exists.` }, 
+          { status: 409 }
+        );
+      }
+    }
+
     const updates: any = { updatedAt: new Date() }
     if (content !== undefined) updates.content = content
     if (name !== undefined) updates.name = name
@@ -104,7 +142,7 @@ export async function PUT(request: Request) {
     if (isActive) {
       await File.updateMany(
         { 
-          userId: (session.user as any).id,
+          userId,
           isActive: true,
           _id: { $ne: fileId }
         },
@@ -113,12 +151,13 @@ export async function PUT(request: Request) {
     }
 
     const updatedFile = await File.findOneAndUpdate(
-      { _id: fileId, userId: (session.user as any).id },
-      updates,
+      { _id: fileId, userId: userId },
+      { $set: updates },
       { new: true }
     )
 
     if (!updatedFile) {
+      // This case should be rare since we already checked
       return NextResponse.json({ error: "File not found" }, { status: 404 })
     }
 
@@ -141,9 +180,10 @@ export async function DELETE(request: Request) {
   }
 
   const { fileId } = await request.json()
+  const userId = (session.user as any).id;
 
   try {
-    const file = await File.findOne({ _id: fileId, userId: (session.user as any).id })
+    const file = await File.findOne({ _id: fileId, userId: userId })
     if (!file) {
       return NextResponse.json({ error: "File not found" }, { status: 404 })
     }
@@ -167,19 +207,28 @@ export async function DELETE(request: Request) {
         $pull: { children: file._id }
       })
     }
-
+    
     await File.deleteOne({ _id: fileId })
 
+    let newActiveFileId = null;
     if (file.isActive) {
-      const anotherFile = await File.findOne({ userId: (session.user as any).id, isFolder: false });
-      if (anotherFile) {
-        await File.findByIdAndUpdate(anotherFile._id, {
-          isActive: true
+      const openFiles = await File.find({ userId, isFolder: false, isOpen: true, _id: { $ne: fileId } }).sort({updatedAt: -1});
+      let nextActiveFile = openFiles[0];
+      
+      if (!nextActiveFile) {
+        nextActiveFile = await File.findOne({ userId, isFolder: false, _id: { $ne: fileId } }).sort({updatedAt: -1});
+      }
+
+      if (nextActiveFile) {
+        await File.findByIdAndUpdate(nextActiveFile._id, {
+          isActive: true,
+          isOpen: true
         });
+        newActiveFileId = nextActiveFile._id.toString();
       }
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, newActiveFileId })
   } catch (error) {
     console.error("Failed to delete file:", error);
     return NextResponse.json(
