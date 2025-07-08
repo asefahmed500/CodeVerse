@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
@@ -153,49 +154,12 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     return buildPath(fileId);
   }, [files]);
 
-  const getUniqueName = useCallback((baseName: string, parentId: string | undefined | null): string => {
-    const existingNames = new Set<string>();
-
-    function findNames(items: FileType[], targetParentId: string | null) {
-      if (targetParentId === null) {
-        items.forEach(item => {
-          if (item.parentId === null) existingNames.add(item.name);
-        });
-        return;
-      }
-
-      for (const item of items) {
-        if (item._id === targetParentId && item.isFolder) {
-          (item.children || []).forEach(child => existingNames.add(child.name));
-          return;
-        }
-        if (item.isFolder && item.children) {
-          findNames(item.children, targetParentId);
-        }
-      }
-    }
-    findNames(files, parentId || null);
-
-    let newName = baseName;
-    let counter = 1;
-    const nameParts = baseName.split('.');
-    const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
-    const nameWithoutExt = nameParts.join('.');
-
-    while (existingNames.has(newName)) {
-      newName = `${nameWithoutExt}-${counter}${ext || ''}`;
-      counter++;
-    }
-    return newName;
-  }, [files]);
-
   const createFile = async (name: string, parentId?: string): Promise<FileType | null> => {
-    const uniqueName = getUniqueName(name, parentId);
     try {
       const res = await fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: uniqueName, isFolder: false, parentId, isActive: true, isOpen: true }),
+        body: JSON.stringify({ name, isFolder: false, parentId, isActive: true, isOpen: true }),
       });
 
       if (!res.ok) {
@@ -214,18 +178,17 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
       router.push(`/editor/${newFile._id}`);
       return newFile;
     } catch (e) {
-      toast.error("An unexpected error occurred.");
+      toast.error("An unexpected error occurred while creating the file.");
       return null;
     }
   };
 
   const createFolder = async (name: string, parentId?: string): Promise<FileType | null> => {
-    const uniqueName = getUniqueName(name, parentId);
     try {
       const res = await fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: uniqueName, isFolder: true, parentId }),
+        body: JSON.stringify({ name, isFolder: true, parentId }),
       });
       if (!res.ok) {
         const { error } = await res.json();
@@ -237,7 +200,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
       if(parentId) expandFolder(parentId);
       return newFolder;
     } catch (e) {
-      toast.error("An unexpected error occurred.");
+      toast.error("An unexpected error occurred while creating the folder.");
       return null;
     }
   };

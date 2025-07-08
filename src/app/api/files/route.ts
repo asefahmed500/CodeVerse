@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { File } from "@/models/File"
@@ -47,21 +48,30 @@ export async function POST(request: Request) {
   const userId = (session.user as any).id;
 
   try {
-    const existingFile = await File.findOne({
-      name,
-      parentId: parentId || null,
-      userId,
-    });
+    // --- New unique name generation logic on the server ---
+    let finalName = name;
+    let counter = 1;
 
-    if (existingFile) {
-      return NextResponse.json(
-        { error: `A ${existingFile.isFolder ? 'folder' : 'file'} with the name "${name}" already exists.` }, 
-        { status: 409 }
-      );
+    // Separate base name and extension for files
+    const nameParts = name.split('.');
+    const ext = !isFolder && nameParts.length > 1 ? `.${nameParts.pop()}` : '';
+    const baseName = isFolder ? name : nameParts.join('.');
+
+    // Keep checking for a unique name until one is found
+    while (
+      await File.findOne({
+        name: finalName,
+        parentId: parentId || null,
+        userId,
+      })
+    ) {
+      finalName = `${baseName}-${counter}${ext}`;
+      counter++;
     }
+    // --- End of new logic ---
 
     const newFile = new File({
-      name,
+      name: finalName, // Use the guaranteed unique name
       isFolder,
       parentId: parentId || null,
       userId,
@@ -91,9 +101,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(newFile)
   } catch (error) {
-    console.error("Failed to create file:", error);
+    console.error("Failed to create file/folder:", error);
     return NextResponse.json(
-      { error: "Failed to create file" }, 
+      { error: "Failed to create item. Please try again." }, 
       { status: 500 }
     )
   }
