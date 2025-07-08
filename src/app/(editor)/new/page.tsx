@@ -6,11 +6,9 @@ import { useFileSystem } from "@/hooks/use-file-system";
 
 export default function NewFilePage() {
   const router = useRouter();
-  const { createFile, loading } = useFileSystem();
+  const { createFile } = useFileSystem();
 
   useEffect(() => {
-    if (loading) return;
-
     const createNewUntitledFile = async () => {
       const newFile = await createFile("Untitled.js");
       if (newFile) {
@@ -21,7 +19,7 @@ export default function NewFilePage() {
     };
 
     createNewUntitledFile();
-  }, [createFile, loading, router]);
+  }, [createFile, router]);
 
   return (
     <div className="flex items-center justify-center flex-1 bg-background h-full">

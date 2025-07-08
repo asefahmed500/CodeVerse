@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useFileSystem } from "@/hooks/use-file-system";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -29,35 +29,30 @@ export default function EditorFilePage() {
   const params = useParams();
   const fileId = params.fileId as string;
   const router = useRouter();
-  const { updateFile, findFile, loading, setActiveFileId } = useFileSystem();
+  const { updateFile, findFile, setActiveFileId } = useFileSystem();
   const { isCollapsed, setCollapsed } = useSidebarStore();
 
   const fileToRender = findFile(fileId);
 
-  const syncFileState = useCallback(() => {
-    if (fileToRender && (!fileToRender.isOpen || !fileToRender.isActive)) {
-      updateFile(fileId, { isOpen: true, isActive: true });
-    }
-    setActiveFileId(fileId);
-  }, [fileToRender, updateFile, fileId, setActiveFileId]);
-
-
   useEffect(() => {
-    if (loading) return;
-    
     if (fileToRender) {
       if (fileToRender.isFolder) {
         router.replace('/editor');
         return;
       }
-      syncFileState();
+      if (!fileToRender.isOpen || !fileToRender.isActive) {
+        updateFile(fileId, { isOpen: true, isActive: true });
+      }
+      setActiveFileId(fileId);
     } else {
-      // If the file doesn't exist in the store after loading, redirect.
+      // If the file doesn't exist after hydration, it's an invalid URL.
+      // The layout's hydration guard ensures findFile is reliable here.
       router.replace('/editor');
     }
-  }, [fileId, fileToRender, loading, router, syncFileState]);
+  }, [fileId, fileToRender, router, setActiveFileId, updateFile]);
 
-  if (loading || !fileToRender || fileToRender.isFolder) {
+
+  if (!fileToRender || fileToRender.isFolder) {
     return (
       <div className="flex items-center justify-center flex-1 h-full bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>

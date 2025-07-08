@@ -22,34 +22,33 @@ const getFlatFiles = (files: FileType[]): FileType[] => {
 }
 
 // Find a node and its parent in the tree
-const findNodeWithParent = (files: FileType[], fileId: string): { node: FileType | null, parent: FileType | null } => {
-    for (const file of files) {
-        if (file._id === fileId) return { node: file, parent: null };
-        if (file.isFolder && file.children) {
-            for (const child of file.children) {
-                if (child._id === fileId) return { node: child, parent: file };
-                const found = findNodeWithParent([child], fileId);
-                if(found.node) return found;
+const findNodeWithParent = (files: FileType[], fileId: string): { node: FileType | null, parent: FileType | null, collection: FileType[] } => {
+    const find = (collection: FileType[], parent: FileType | null): { node: FileType | null, parent: FileType | null, collection: FileType[] } => {
+        for (const file of collection) {
+            if (file._id === fileId) return { node: file, parent, collection };
+            if (file.isFolder && file.children) {
+                const found = find(file.children, file);
+                if (found.node) return found;
             }
         }
-    }
-    return { node: null, parent: null };
+        return { node: null, parent: null, collection };
+    };
+    return find(files, null);
 };
-
 
 interface FileSystemState {
   files: FileType[];
-  loading: boolean;
   activeFileId: string | null;
   expandedFolders: string[];
   allFiles: FileType[]; // Derived state, kept for quick lookups
+  activeFile: FileType | null; // Derived state for convenience
   
   // Actions
   _setFiles: (files: FileType[]) => void;
   findFile: (fileId: string) => FileType | null;
   getPathForFile: (fileId: string) => string;
-  createFile: (name: string, parentId?: string) => Promise<FileType | null>;
-  createFolder: (name: string, parentId?: string) => Promise<void>;
+  createFile: (name: string, parentId?: string, content?: string) => Promise<FileType | null>;
+  createFolder: (name: string, parentId?: string) => Promise<FileType | null>;
   updateFile: (fileId: string, updates: Partial<FileType>, options?: { optimistic?: boolean, noUpdate?: boolean }) => Promise<void>;
   deleteFile: (fileId: string) => Promise<void>;
   setActiveFileId: (fileId: string | null) => void;
@@ -64,14 +63,16 @@ const useFileSystemStore = create<FileSystemState>()(
   persist(
     (set, get) => ({
       files: [],
-      loading: false, // Start with false for local storage
       activeFileId: null,
       expandedFolders: [],
       allFiles: [],
+      activeFile: null,
 
       _setFiles: (files: FileType[]) => {
         const allFiles = getFlatFiles(files);
-        set({ files, allFiles });
+        const activeFileId = get().activeFileId;
+        const activeFile = allFiles.find(f => f._id === activeFileId) || null;
+        set({ files, allFiles, activeFile });
       },
 
       findFile: (fileId: string) => {
@@ -86,18 +87,37 @@ const useFileSystemStore = create<FileSystemState>()(
             if (!file) return '';
             if (!file.parentId) return `/${file.name}`;
             const parent = fileMap.get(file.parentId);
-            if (!parent) return `/${file.name}`;
+            // This is a safeguard against orphaned files, should not happen in normal operation
+            if (!parent) return `/${file.name}`; 
             const parentPath = buildPath(parent._id);
-            return parentPath === '/' ? `/${file.name}` : `${parentPath}/${file.name}`;
+            // Handle root case properly
+            return parentPath === '/' ? `/${parent.name}/${file.name}` : `${parentPath}/${file.name}`;
         };
-        return buildPath(fileId);
+
+        const file = fileMap.get(fileId);
+        if(!file) return '';
+        if(!file.parentId) return `/${file.name}`;
+        
+        // A slightly different approach to ensure correctness
+        const pathParts: string[] = [file.name];
+        let currentParentId = file.parentId;
+        while(currentParentId) {
+          const parent = fileMap.get(currentParentId);
+          if (parent) {
+            pathParts.unshift(parent.name);
+            currentParentId = parent.parentId;
+          } else {
+            break;
+          }
+        }
+        return `/${pathParts.join('/')}`;
       },
 
-      createFile: async (name: string, parentId?: string) => {
+      createFile: async (name: string, parentId?: string, content: string = '') => {
         const newFile: FileType = {
           _id: uuidv4(),
           name,
-          content: '',
+          content,
           isFolder: false,
           parentId: parentId || null,
           language: getLanguageConfigFromFilename(name).monacoLanguage,
@@ -107,21 +127,20 @@ const useFileSystemStore = create<FileSystemState>()(
           updatedAt: new Date(),
         };
 
-        set(produce(draft => {
-            const allFiles = getFlatFiles(draft.files);
-            allFiles.forEach(f => f.isActive = false); // Deactivate all other files
+        const files = produce(get().files, draft => {
+            getFlatFiles(draft).forEach(f => f.isActive = false); // Deactivate all other files
             if (parentId) {
-                const parent = getFlatFiles(draft.files).find(f => f._id === parentId);
-                if (parent && parent.isFolder) {
+                const parent = getFlatFiles(draft).find(f => f._id === parentId && f.isFolder);
+                if (parent) {
                     if (!parent.children) parent.children = [];
                     parent.children.push(newFile);
                 }
             } else {
-                draft.files.push(newFile);
+                draft.push(newFile);
             }
-        }));
-        get()._setFiles(get().files); // Recalculate allFiles
+        });
         
+        get()._setFiles(files);
         get().setActiveFileId(newFile._id);
         toast.success(`File "${newFile.name}" created.`);
         return newFile;
@@ -142,38 +161,45 @@ const useFileSystemStore = create<FileSystemState>()(
           updatedAt: new Date(),
         };
 
-         set(produce(draft => {
+         const files = produce(get().files, draft => {
             if (parentId) {
-                const parent = getFlatFiles(draft.files).find(f => f._id === parentId);
+                const parent = getFlatFiles(draft).find(f => f._id === parentId);
                 if (parent && parent.isFolder) {
                     if (!parent.children) parent.children = [];
                     parent.children.push(newFolder);
                 }
             } else {
-                draft.files.push(newFolder);
+                draft.push(newFolder);
             }
-        }));
-        get()._setFiles(get().files);
-        if (parentId) get().toggleFolder(parentId);
+        });
+
+        get()._setFiles(files);
+        if (parentId && !get().expandedFolders.includes(parentId)) {
+          get().toggleFolder(parentId);
+        }
         toast.success(`Folder "${newFolder.name}" created.`);
+        return newFolder;
       },
       
       updateFile: async (fileId: string, updates: Partial<FileType>, options = {}) => {
-        set(produce(draft => {
-            const file = getFlatFiles(draft.files).find(f => f._id === fileId);
+        const files = produce(get().files, draft => {
+            const file = getFlatFiles(draft).find(f => f._id === fileId);
             if (file) {
                 Object.assign(file, updates, { updatedAt: new Date() });
                 
-                // If making active, deactivate others
                 if (updates.isActive) {
-                    getFlatFiles(draft.files).forEach(f => {
+                    getFlatFiles(draft).forEach(f => {
                         if (f._id !== fileId) f.isActive = false;
                     });
                 }
             }
-        }));
+        });
+        
         if (!options.noUpdate) {
-            get()._setFiles(get().files);
+            get()._setFiles(files);
+        } else {
+          // For optimistic updates that don't trigger a full recalculation immediately
+          set({ files });
         }
       },
 
@@ -181,25 +207,17 @@ const useFileSystemStore = create<FileSystemState>()(
         const fileToDelete = get().findFile(fileId);
         if (!fileToDelete) return;
 
-        set(produce(draft => {
-            const deleteRecursively = (id: string) => {
-                const { node, parent } = findNodeWithParent(draft.files, id);
-                if (!node) return;
-
-                if (node.isFolder && node.children) {
-                    [...node.children].forEach(child => deleteRecursively(child._id));
-                }
-                
-                const targetArray = parent ? parent.children : draft.files;
-                const index = targetArray.findIndex(f => f._id === id);
+        const files = produce(get().files, draft => {
+            const { parent, collection, node } = findNodeWithParent(draft, fileId);
+            if (node) {
+                const index = collection.findIndex(f => f._id === fileId);
                 if (index > -1) {
-                    targetArray.splice(index, 1);
+                    collection.splice(index, 1);
                 }
-            };
-            deleteRecursively(fileId);
-        }));
+            }
+        });
 
-        get()._setFiles(get().files); // Recalculate flat files
+        get()._setFiles(files);
         if (get().activeFileId === fileId) {
             get().setActiveFileId(null);
         }
@@ -209,9 +227,13 @@ const useFileSystemStore = create<FileSystemState>()(
       setActiveFileId: (fileId: string | null) => {
         if (get().activeFileId === fileId) return;
         set({ activeFileId: fileId });
-        if (fileId) {
-            get().updateFile(fileId, { isActive: true });
-        }
+
+        const files = produce(get().files, draft => {
+          getFlatFiles(draft).forEach(f => {
+            f.isActive = f._id === fileId;
+          });
+        });
+        get()._setFiles(files);
       },
 
       toggleFolder: (folderId: string) => {
@@ -227,57 +249,69 @@ const useFileSystemStore = create<FileSystemState>()(
           if (!query) return [];
           const allFiles = get().allFiles;
           const results: SearchResult[] = [];
-          const regex = new RegExp(query, 'gi');
 
-          for (const file of allFiles) {
-              if (file.isFolder) continue;
-
-              const contentMatches: SearchMatch[] = [];
-              if (file.content) {
-                  const lines = file.content.split('\n');
-                  lines.forEach((line, index) => {
-                      if (regex.test(line)) {
-                          contentMatches.push({ lineNumber: index + 1, lineContent: line });
-                      }
-                  });
-              }
-
-              if (regex.test(file.name) || contentMatches.length > 0) {
-                  results.push({ file, matches: contentMatches });
-              }
+          try {
+            const regex = new RegExp(query, 'gi');
+  
+            for (const file of allFiles) {
+                if (file.isFolder) continue;
+  
+                const contentMatches: SearchMatch[] = [];
+                if (file.content) {
+                    const lines = file.content.split('\n');
+                    lines.forEach((line, index) => {
+                        if (regex.test(line)) {
+                            contentMatches.push({ lineNumber: index + 1, lineContent: line });
+                        }
+                    });
+                }
+  
+                // Reset regex state for the next test
+                regex.lastIndex = 0;
+                if (regex.test(file.name) || contentMatches.length > 0) {
+                    results.push({ file, matches: contentMatches });
+                }
+            }
+          } catch (e) {
+            toast.error("Invalid regular expression in search query.");
+            return [];
           }
           return results;
       },
 
       replaceInFiles: async (query: string, replaceWith: string) => {
-        const filesToUpdate = get().allFiles.filter(f => !f.isFolder && f.content && f.content.includes(query));
-        const regex = new RegExp(query, 'g');
-        
-        let totalReplacements = 0;
-        set(produce(draft => {
-            filesToUpdate.forEach(file => {
-                const originalContent = file.content;
-                const replacementCount = (originalContent.match(regex) || []).length;
-                if(replacementCount > 0){
-                    const liveFile = getFlatFiles(draft.files).find(f => f._id === file._id);
-                    if(liveFile) {
+        try {
+          const regex = new RegExp(query, 'g');
+          const filesToUpdate = get().allFiles.filter(f => !f.isFolder && f.content && regex.test(f.content));
+          regex.lastIndex = 0; // Reset
+          
+          let totalReplacements = 0;
+          const files = produce(get().files, draft => {
+              filesToUpdate.forEach(fileData => {
+                  const liveFile = getFlatFiles(draft).find(f => f._id === fileData._id);
+                  if (liveFile) {
+                    const originalContent = liveFile.content;
+                    const replacementCount = (originalContent.match(regex) || []).length;
+                    if(replacementCount > 0){
                         liveFile.content = originalContent.replace(regex, replaceWith);
                         totalReplacements += replacementCount;
                     }
-                }
-            })
-        }));
-
-        get()._setFiles(get().files);
-        if (totalReplacements > 0) {
-            toast.success(`Replaced ${totalReplacements} instance(s) in ${filesToUpdate.length} file(s).`);
-        } else {
-            toast.info("No occurrences found to replace.");
+                  }
+              })
+          });
+  
+          get()._setFiles(files);
+          if (totalReplacements > 0) {
+              toast.success(`Replaced ${totalReplacements} instance(s) in ${filesToUpdate.length} file(s).`);
+          } else {
+              toast.info("No occurrences found to replace.");
+          }
+        } catch (e) {
+          toast.error("Invalid regular expression in search query.");
         }
       },
       
       setWorkspaceFromGitHub: async (owner: string, repo: string) => {
-        set({ loading: true });
         try {
             const res = await fetch(`/api/github?action=getRepoTree&owner=${owner}&repo=${repo}`);
             const ghFiles = await res.json();
@@ -285,7 +319,6 @@ const useFileSystemStore = create<FileSystemState>()(
 
             if (ghFiles.length === 0) {
               toast.warning("Repository is empty or contains no supported text files.");
-              set({ loading: false });
               return;
             }
             
@@ -293,63 +326,61 @@ const useFileSystemStore = create<FileSystemState>()(
             const newFileTree: FileType[] = [];
             const dirMap = new Map<string, FileType>();
 
+            // Sort files to ensure directories are created before files inside them
+            ghFiles.sort((a: any, b: any) => a.path.localeCompare(b.path));
+
             for (const fileData of ghFiles) {
                 const parts = fileData.path.split('/');
-                let currentParentId: string | null = null;
-                let currentPath = '';
+                const fileName = parts.pop()!;
+                const dirPath = parts.join('/');
+                
+                const parent = dirPath ? dirMap.get(dirPath) : null;
 
-                for (let i = 0; i < parts.length; i++) {
-                    const part = parts[i];
-                    currentPath = i === 0 ? part : `${currentPath}/${part}`;
-                    const isFolder = i < parts.length - 1;
+                const newItem: FileType = {
+                  _id: uuidv4(),
+                  name: fileName,
+                  content: fileData.content || '',
+                  isFolder: fileData.content === undefined, // Simple check if it's a directory
+                  parentId: parent ? parent._id : null,
+                  language: fileData.content !== undefined ? getLanguageConfigFromFilename(fileName).monacoLanguage : 'plaintext',
+                  isOpen: false,
+                  isActive: false,
+                  children: fileData.content === undefined ? [] : undefined,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                };
 
-                    if (!dirMap.has(currentPath)) {
-                        const newItem: FileType = {
-                            _id: uuidv4(),
-                            name: part,
-                            content: isFolder ? '' : fileData.content,
-                            isFolder,
-                            parentId: currentParentId,
-                            language: isFolder ? 'plaintext' : getLanguageConfigFromFilename(part).monacoLanguage,
-                            isOpen: false,
-                            isActive: false,
-                            children: isFolder ? [] : undefined,
-                            createdAt: new Date(),
-                            updatedAt: new Date(),
-                        };
-                        dirMap.set(currentPath, newItem);
+                if (newItem.isFolder) {
+                  dirMap.set(fileData.path, newItem);
+                }
 
-                        const parent = currentParentId ? dirMap.get(parts.slice(0, i).join('/')) : null;
-                        if (parent) {
-                            parent.children?.push(newItem);
-                        } else {
-                            newFileTree.push(newItem);
-                        }
-                    }
-                    if (isFolder) {
-                        currentParentId = dirMap.get(currentPath)!._id;
-                    }
+                if (parent) {
+                  parent.children?.push(newItem);
+                } else {
+                  newFileTree.push(newItem);
                 }
             }
             
-            set({ files: newFileTree, allFiles: Array.from(dirMap.values()) });
+            get().reset(); // Clear existing workspace
+            get()._setFiles(newFileTree);
+
             const firstFile = get().allFiles.find(f => !f.isFolder);
             if(firstFile) {
                 get().setActiveFileId(firstFile._id);
+                get().updateFile(firstFile._id, { isOpen: true, isActive: true });
+                return firstFile._id; // To allow redirection
             }
         } catch (error: any) {
             toast.error(error.message);
-        } finally {
-            set({ loading: false });
         }
       },
       
       reset: () => {
-        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [] });
+        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [], activeFile: null });
       }
     }),
     {
-      name: 'codeverse-file-system-local-v3', 
+      name: 'codeverse-file-system-local-v4', 
       storage: createJSONStorage(() => localStorage), 
     }
   )
