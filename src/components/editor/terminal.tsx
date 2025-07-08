@@ -249,7 +249,7 @@ export function Terminal({
         }
     });
 
-    xterm.current.writeln('Welcome to CodeVerse Terminal!');
+    xterm.current.writeln('Welcome to Aethermind Terminal!');
     xterm.current.writeln("Type 'help' for a list of available commands.");
     xterm.current.write(prompt(currentPath));
     

@@ -27,7 +27,7 @@ export default function EditorPage() {
         maxSize={30}
         className="bg-card hidden md:block"
         collapsible={true}
-        collapsed={isCollapsed || undefined}
+        collapsed={isCollapsed ? true : undefined}
         onCollapse={() => setCollapsed(true)}
         onExpand={() => setCollapsed(false)}
       >
@@ -38,7 +38,7 @@ export default function EditorPage() {
         <div className="flex items-center justify-center h-full bg-background">
           <div className="text-center p-4">
             <h3 className="text-lg font-medium text-foreground">
-              Welcome to CodeVerse
+              Welcome to Aethermind IDE
             </h3>
             <p className="text-sm text-muted-foreground">
               Select a file from the explorer to start editing or create a new one.

@@ -73,7 +73,7 @@ function FileTree() {
       <Collapsible defaultOpen>
         <CollapsibleTrigger className="flex items-center p-1 font-bold text-sm uppercase w-full">
             <ChevronRight size={16} className="transform transition-transform duration-200 data-[state=open]:rotate-90"/>
-            <span className="ml-1">CodeVerse Workspace</span>
+            <span className="ml-1">AETHERMIND WORKSPACE</span>
         </CollapsibleTrigger>
         <CollapsibleContent>
             {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}

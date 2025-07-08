@@ -19,8 +19,8 @@ export function TitleBar() {
   const activeFile = findFile(activeFileId || '');
 
   const title = activeFile
-    ? `${activeFile.name} - CodeVerse`
-    : 'CodeVerse';
+    ? `${activeFile.name} - Aethermind IDE`
+    : 'Aethermind IDE';
   
   const languageConfig = activeFile ? getLanguageConfigFromFilename(activeFile.name) : null;
   const isRunnable = activeFile && !activeFile.isFolder;
