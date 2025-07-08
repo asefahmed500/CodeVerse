@@ -71,3 +71,13 @@ export interface UserType {
   createdAt: Date
   updatedAt: Date
 }
+
+export interface SearchMatch {
+  lineNumber: number;
+  lineContent: string;
+}
+
+export interface SearchResult {
+  file: FileType;
+  matches: SearchMatch[];
+}

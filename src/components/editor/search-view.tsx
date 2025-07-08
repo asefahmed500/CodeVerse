@@ -3,17 +3,46 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, X, File as FileIcon } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useDebounce } from 'use-debounce'
 import { useRouter } from 'next/navigation'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { toast } from 'sonner'
-import type { FileType } from '@/types'
+import type { FileType, SearchResult } from '@/types'
 import { useActiveView } from '@/hooks/use-active-view'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { FileIcon } from './file-icon'
+
+const Highlight = ({ text, highlight }: { text: string; highlight: string }) => {
+  if (!highlight.trim()) {
+    return <span>{text}</span>;
+  }
+  try {
+    const regex = new RegExp(`(${highlight})`, 'gi');
+    const parts = text.split(regex);
+  
+    return (
+      <span>
+        {parts.map((part, i) =>
+          regex.test(part) ? (
+            <mark key={i} className="bg-primary/20 text-primary-foreground rounded-sm px-0.5">
+              {part}
+            </mark>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
+      </span>
+    );
+  } catch (e) {
+    return <span>{text}</span>;
+  }
+};
+
 
 export function SearchView() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<FileType[]>([])
+  const [results, setResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [debouncedQuery] = useDebounce(query, 500)
   const router = useRouter()
@@ -49,8 +78,8 @@ export function SearchView() {
     searchFiles(debouncedQuery)
   }, [debouncedQuery, searchFiles])
 
-  const handleResultClick = (result: FileType) => {
-    router.push(`/editor/${result._id}`)
+  const handleResultClick = (file: FileType) => {
+    router.push(`/editor/${file._id}`)
   }
 
   if (activeView !== 'search') {
@@ -87,25 +116,34 @@ export function SearchView() {
             <p className="text-xs text-muted-foreground mb-2">
                 {results.length} results in {results.length} files
             </p>
-            <ul>
-                {results.map((result) => (
-                <li 
-                    key={result._id} 
-                    className="p-2 hover:bg-accent cursor-pointer rounded-md"
-                    onClick={() => handleResultClick(result)}
-                >
-                    <div className="flex items-center font-medium text-sm">
-                        <FileIcon className="h-4 w-4 mr-2" />
-                        {result.name}
+            <Accordion type="multiple" className="w-full">
+              {results.map(({ file, matches }) => (
+                <AccordionItem value={file._id} key={file._id}>
+                  <AccordionTrigger 
+                    className="p-1 text-left hover:bg-accent rounded-md text-sm"
+                    onClick={() => { if (matches.length === 0) handleResultClick(file) }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileIcon filename={file.name} className="h-4 w-4" />
+                      <span>{file.name}</span>
                     </div>
-                    {result.content && !result.isFolder && (
-                    <div className="text-xs text-muted-foreground truncate mt-1 pl-6">
-                        {result.content.substring(0, 100).replace(/\n/g, ' ')}
-                    </div>
-                    )}
-                </li>
-                ))}
-            </ul>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="pl-4">
+                      {matches.map((match, index) => (
+                        <li
+                          key={`${file._id}-${index}`}
+                          className="text-xs text-muted-foreground truncate p-1 rounded-md hover:bg-accent cursor-pointer"
+                          onClick={() => handleResultClick(file)}
+                        >
+                          <Highlight text={match.lineContent} highlight={query} />
+                        </li>
+                      ))}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
         )}
       </div>

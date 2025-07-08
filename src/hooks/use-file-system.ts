@@ -7,6 +7,17 @@ import { toast } from "sonner";
 import type { FileType } from "@/types";
 
 // --- Helper Functions ---
+const findNodeInTree = (files: FileType[], fileId: string): FileType | null => {
+  for (const file of files) {
+      if (file._id === fileId) return file;
+      if (file.isFolder && file.children) {
+          const found = findNodeInTree(file.children, fileId);
+          if (found) return found;
+      }
+  }
+  return null;
+};
+
 const updateFileInTree = (files: FileType[], fileId: string, updates: Partial<FileType>): FileType[] => {
   return files.map(file => {
     if (file._id === fileId) {
@@ -124,6 +135,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
             return addFileToTree(deactivated, newFile)
         });
         setActiveFile(newFile);
+        router.push(`/editor/${newFile._id}`);
         return newFile;
     } catch (e) {
         toast.error("An unexpected error occurred.");
@@ -157,50 +169,79 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
   };
 
   const updateFile = async (fileId: string, updates: Partial<FileType>) => {
-    const res = await fetch("/api/files", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileId, ...updates }),
-      });
-    if (!res.ok) throw new Error("Failed to update file");
-    const updatedFile = await res.json();
-
+    const previousFiles = files;
+    
+    // Optimistic UI update
     setFiles(prev => {
         let tree = prev;
         if (updates.isActive) {
             tree = deactivateAllFiles(tree);
         }
-        return updateFileInTree(tree, fileId, updatedFile);
-    });
+        const updatedTree = updateFileInTree(tree, fileId, updates);
+        
+        if (updates.isActive) {
+          const updatedFile = findNodeInTree(updatedTree, fileId);
+          setActiveFile(updatedFile);
+        }
 
-    if (updates.isActive) {
-        setActiveFile(updatedFile);
-    }
-    if (updates.isOpen === false && activeFile?._id === fileId) {
-      // Logic to switch active file is handled in component
+        return updatedTree;
+    });
+    
+    try {
+        const res = await fetch("/api/files", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileId, ...updates }),
+        });
+        if (!res.ok) throw new Error("Failed to update file on server");
+        
+        const finalUpdatedFile = await res.json();
+        // Sync with server state
+        setFiles(prev => updateFileInTree(prev, fileId, finalUpdatedFile));
+        if (updates.isActive) {
+            setActiveFile(finalUpdatedFile);
+        }
+
+    } catch (error) {
+        toast.error(`Failed to update file.`);
+        setFiles(previousFiles); // Rollback on error
     }
   };
 
   const deleteFile = async (fileId: string) => {
-    const res = await fetch("/api/files", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileId }),
-    });
-    const { success, newActiveFileId } = await res.json();
+    const previousFiles = files;
+    const fileToDelete = findNodeInTree(files, fileId);
 
-    if (success) {
-        setFiles(prev => deleteFileFromTree(prev, fileId));
-        if (activeFile?._id === fileId) {
-            if (newActiveFileId) {
-                router.push(`/editor/${newActiveFileId}`);
-            } else {
-                setActiveFile(null);
-                router.push('/editor');
+    if (!fileToDelete) return;
+
+    // Optimistic update
+    setFiles(prev => deleteFileFromTree(prev, fileId));
+    
+    try {
+        const res = await fetch("/api/files", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileId }),
+        });
+        
+        if (!res.ok) throw new Error("Failed to delete file on server.");
+
+        const { success, newActiveFileId } = await res.json();
+        if (success) {
+            if (activeFile?._id === fileId) {
+                if (newActiveFileId) {
+                    router.push(`/editor/${newActiveFileId}`);
+                } else {
+                    setActiveFile(null);
+                    router.push('/editor');
+                }
             }
+        } else {
+          throw new Error("Server failed to delete file.");
         }
-    } else {
-        toast.error("Failed to delete file.");
+    } catch(error) {
+        toast.error(`Failed to delete ${fileToDelete.name}.`);
+        setFiles(previousFiles);
     }
   };
 
@@ -216,7 +257,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     refreshFiles: fetchFiles,
   };
 
-  return React.createElement(FileSystemContext.Provider, { value: value }, children);
+  return React.createElement(FileSystemContext.Provider, { value }, children);
 }
 
 export const useFileSystem = () => {
