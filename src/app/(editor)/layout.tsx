@@ -13,6 +13,13 @@ import { useFileSystem } from "@/hooks/use-file-system";
 import { useTerminalManager } from "@/hooks/use-terminal-manager-store";
 import { useRouter } from "next/navigation";
 import { IDE_MANUAL } from "@/config/manual";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import { SidebarView } from "@/components/editor/sidebar-view";
+import { useSidebarStore } from "@/hooks/use-sidebar-store";
 
 export default function EditorLayout({
   children,
@@ -21,6 +28,7 @@ export default function EditorLayout({
 }) {
   const [isHydrated, setIsHydrated] = useState(false);
   const router = useRouter();
+  const { isCollapsed, setCollapsed } = useSidebarStore();
 
   // Wait for zustand stores to rehydrate
   useEffect(() => {
@@ -81,10 +89,27 @@ greet("Developer");
         <TitleBar />
         <div className="flex flex-1 overflow-hidden">
           <ActivityBar />
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <EditorTabs />
-            {children}
-          </div>
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            <ResizablePanel
+              defaultSize={20}
+              minSize={15}
+              maxSize={30}
+              className="bg-card hidden md:block"
+              collapsible={true}
+              collapsed={isCollapsed ? true : undefined}
+              onCollapse={() => setCollapsed(true)}
+              onExpand={() => setCollapsed(false)}
+            >
+              <SidebarView />
+            </ResizablePanel>
+            <ResizableHandle withHandle className="hidden md:flex" />
+            <ResizablePanel defaultSize={80}>
+                <div className="flex flex-col h-full overflow-hidden">
+                    <EditorTabs />
+                    {children}
+                </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
         <Panel />
         <StatusBar />

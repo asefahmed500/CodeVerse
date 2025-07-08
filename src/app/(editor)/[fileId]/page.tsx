@@ -3,13 +3,6 @@
 import { useParams, useRouter } from "next/navigation";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useEffect } from "react";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
-import { SidebarView } from "@/components/editor/sidebar-view";
-import { useSidebarStore } from "@/hooks/use-sidebar-store";
 import dynamic from "next/dynamic";
 import type { FileType } from "@/types";
 
@@ -30,7 +23,6 @@ export default function EditorFilePage() {
   const fileId = params.fileId as string;
   const router = useRouter();
   const { updateFile, findFile, setActiveFileId } = useFileSystem();
-  const { isCollapsed, setCollapsed } = useSidebarStore();
 
   const fileToRender = findFile(fileId);
 
@@ -61,23 +53,6 @@ export default function EditorFilePage() {
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="flex-1">
-      <ResizablePanel
-        defaultSize={20}
-        minSize={15}
-        maxSize={30}
-        className="bg-card hidden md:block"
-        collapsible={true}
-        collapsed={isCollapsed ? true : undefined}
-        onCollapse={() => setCollapsed(true)}
-        onExpand={() => setCollapsed(false)}
-      >
-        <SidebarView />
-      </ResizablePanel>
-      <ResizableHandle withHandle className="hidden md:flex" />
-      <ResizablePanel defaultSize={80}>
-        <CodeEditor file={fileToRender as FileType} key={fileToRender._id} />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      <CodeEditor file={fileToRender as FileType} key={fileToRender._id} />
   );
 }
