@@ -8,6 +8,7 @@ import type { Session } from 'next-auth';
 import { CommandPalette } from './command-palette';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getLanguageConfigFromFilename } from '@/config/languages';
 
 export function TitleBar({ session }: { session: Session | null }) {
   const { activeFile, getPathForFile } = useFileSystem();
@@ -18,14 +19,17 @@ export function TitleBar({ session }: { session: Session | null }) {
     ? `${activeFile.name} - CodeVerse`
     : 'CodeVerse';
   
-  const isRunnable = activeFile && !activeFile.isFolder && (activeFile.name.endsWith('.js') || activeFile.name.endsWith('.ts'));
+  const languageConfig = activeFile ? getLanguageConfigFromFilename(activeFile.name) : null;
+  const isRunnable = activeFile && !activeFile.isFolder && languageConfig && languageConfig.judge0Id;
 
   const handleRun = () => {
-    if (!activeFile) return;
+    if (!activeFile || !languageConfig) return;
+
     const path = getPathForFile(activeFile._id);
     if (path) {
         openView('terminal');
-        runCommand(`node ${path}`);
+        const command = languageConfig.runner || 'node';
+        runCommand(`${command} ${path}`);
     } else {
         toast.error("Could not determine file path to run.");
     }

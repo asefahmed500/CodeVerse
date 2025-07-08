@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { EDITOR_CONFIG } from "@/config/editor";
-import { getLanguageFromFilename } from "@/config/languages";
+import { getLanguageConfigFromFilename } from "@/config/languages";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { debounce } from "@/lib/utils";
 
@@ -42,13 +42,15 @@ export function CodeEditor({ file }: { file: FileType }) {
     debouncedSave(newContent);
   };
 
+  const languageConfig = getLanguageConfigFromFilename(file.name);
+
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e]">
       <div className="flex-1">
         <Editor
           height="100%"
           path={file.name}
-          defaultLanguage={getLanguageFromFilename(file.name)}
+          defaultLanguage={languageConfig.monacoLanguage}
           theme={theme === "dark" ? "vs-dark" : "light"}
           value={content}
           onChange={handleEditorChange}

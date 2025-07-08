@@ -1,18 +1,20 @@
 'use client';
 import { File, Folder, Image, FileJson, FileCode, FileText } from 'lucide-react';
-import { getLanguageFromFilename } from '@/config/languages';
+import { getLanguageConfigFromFilename } from '@/config/languages';
 
 export const FileIcon = ({ filename, isFolder, isExpanded, className }: { filename: string, isFolder?: boolean, isExpanded?: boolean, className?: string }) => {
   if (isFolder) {
     return <Folder size={16} className={className} />;
   }
 
-  const lang = getLanguageFromFilename(filename);
+  const lang = getLanguageConfigFromFilename(filename);
 
-  switch (lang) {
+  switch (lang.monacoLanguage) {
     case 'javascript':
     case 'typescript':
       return <FileCode size={16} className={className || "text-yellow-400"} />;
+    case 'python':
+      return <FileCode size={16} className={className || "text-green-400"} />;
     case 'json':
       return <FileJson size={16} className={className || "text-yellow-400"} />;
     case 'html':

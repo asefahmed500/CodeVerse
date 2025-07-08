@@ -8,7 +8,8 @@ import type { FileType, TerminalSessionType } from "@/types";
 import { useTheme } from "next-themes";
 import { debounce } from "@/lib/utils";
 import { useTerminalStore } from "@/hooks/use-terminal-store";
-import { runJsCode } from "@/lib/code-runner";
+import { executeCode } from "@/lib/code-runner";
+import { getLanguageConfigFromFilename } from "@/config/languages";
 
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
 
@@ -88,7 +89,8 @@ export function Terminal({
             term.writeln('  cat [file]   - Display file content');
             term.writeln('  pwd          - Print working directory');
             term.writeln('  echo [text]  - Display a line of text');
-            term.writeln('  node [file]  - Execute a JavaScript file');
+            term.writeln('  node [file]  - Execute a JS/TS file');
+            term.writeln('  python [file]- Execute a Python file');
             term.writeln('  clear        - Clear the terminal screen');
             term.writeln('  help         - Show this help message');
             break;
@@ -144,22 +146,25 @@ export function Terminal({
             term.clear();
             break;
         case 'node':
+        case 'python':
             const pathArg = args[0];
             if (!pathArg) {
-                term.writeln('\r\nnode: missing file path');
+                term.writeln(`\r\n${cmd}: missing file path`);
                 break;
             }
             const { node: fileToRun } = findNodeByPath(files, pathArg);
-
-            if (fileToRun && !fileToRun.isFolder) {
-                const { logs, error } = await runJsCode(fileToRun.content);
+            const langConfig = fileToRun ? getLanguageConfigFromFilename(fileToRun.name) : null;
+            
+            if (fileToRun && !fileToRun.isFolder && langConfig && langConfig.judge0Id) {
+                term.writeln(`\r\n\x1b[33mRunning ${fileToRun.name}...\x1b[0m`);
+                const { logs, error } = await executeCode(fileToRun.content, langConfig.judge0Id);
                 term.writeln('');
                 logs.forEach(log => term.writeln(`\r${log}`));
                 if (error) {
                     term.writeln(`\r\x1b[1;31mExecution failed: ${error}\x1b[0m`);
                 }
             } else {
-                term.writeln(`\r\nnode: file not found: ${pathArg}`);
+                term.writeln(`\r\n${cmd}: cannot execute '${pathArg}'. Not a valid or runnable file.`);
             }
             break;
         case '':
