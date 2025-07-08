@@ -11,7 +11,7 @@ import { CommandPalette } from "@/components/editor/command-palette";
 import { useEffect, useState } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useTerminalManager } from "@/hooks/use-terminal-manager-store";
-import { useRouter } from "next/navigation";
+import { useRouter, redirect } from "next/navigation";
 import { IDE_MANUAL } from "@/config/manual";
 import {
   ResizablePanelGroup,
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/resizable";
 import { SidebarView } from "@/components/editor/sidebar-view";
 import { useSidebarStore } from "@/hooks/use-sidebar-store";
+import { useSession } from "next-auth/react";
 
 export default function EditorLayout({
   children,
@@ -29,6 +30,13 @@ export default function EditorLayout({
   const [isHydrated, setIsHydrated] = useState(false);
   const router = useRouter();
   const { isCollapsed, setCollapsed } = useSidebarStore();
+  
+  const { status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      redirect('/signin');
+    },
+  });
 
   // Wait for zustand stores to rehydrate
   useEffect(() => {
@@ -72,7 +80,7 @@ greet("Developer");
     }
   }, [isHydrated, router]);
 
-  if (!isHydrated) {
+  if (status === "loading" || !isHydrated) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
