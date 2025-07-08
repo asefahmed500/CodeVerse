@@ -73,7 +73,7 @@ export default function EditorFilePage() {
         maxSize={30}
         className="bg-card hidden md:block"
         collapsible={true}
-        collapsed={isCollapsed}
+        collapsed={isCollapsed || undefined}
         onCollapse={() => setCollapsed(true)}
         onExpand={() => setCollapsed(false)}
       >
