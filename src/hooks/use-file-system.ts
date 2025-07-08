@@ -61,8 +61,8 @@ interface FileSystemContextType {
   activeFile: FileType | null;
   setActiveFile: (file: FileType | null) => void;
   loading: boolean;
-  createFile: (name: string, parentId?: string) => Promise<FileType>;
-  createFolder: (name: string, parentId?: string) => Promise<FileType>;
+  createFile: (name: string, parentId?: string) => Promise<FileType | null>;
+  createFolder: (name: string, parentId?: string) => Promise<FileType | null>;
   updateFile: (fileId: string, updates: Partial<FileType>) => Promise<void>;
   deleteFile: (fileId: string) => Promise<void>;
   refreshFiles: () => void;
@@ -100,32 +100,60 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
   }, [fetchFiles]);
 
   const createFile = async (name: string, parentId?: string) => {
-    const res = await fetch("/api/files", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, isFolder: false, parentId, isActive: true, isOpen: true }),
-    });
-    if (!res.ok) throw new Error("Failed to create file");
-    const newFile = await res.json();
-    
-    setFiles(prev => {
-        const deactivated = deactivateAllFiles(prev);
-        return addFileToTree(deactivated, newFile)
-    });
-    setActiveFile(newFile);
-    return newFile;
+    try {
+        const res = await fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, isFolder: false, parentId, isActive: true, isOpen: true }),
+        });
+        
+        if (!res.ok) {
+            if (res.status === 409) {
+                const { error } = await res.json();
+                toast.error(error);
+            } else {
+                toast.error("Failed to create file");
+            }
+            return null;
+        }
+
+        const newFile = await res.json();
+        
+        setFiles(prev => {
+            const deactivated = deactivateAllFiles(prev);
+            return addFileToTree(deactivated, newFile)
+        });
+        setActiveFile(newFile);
+        return newFile;
+    } catch (e) {
+        toast.error("An unexpected error occurred.");
+        return null;
+    }
   };
 
   const createFolder = async (name: string, parentId?: string) => {
-    const res = await fetch("/api/files", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, isFolder: true, parentId }),
-      });
-      if (!res.ok) throw new Error("Failed to create folder");
-      const newFolder = await res.json();
-      setFiles(prev => addFileToTree(prev, newFolder));
-      return newFolder;
+    try {
+        const res = await fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, isFolder: true, parentId }),
+          });
+          if (!res.ok) {
+            if (res.status === 409) {
+                const { error } = await res.json();
+                toast.error(error);
+            } else {
+                toast.error("Failed to create folder");
+            }
+            return null;
+          }
+          const newFolder = await res.json();
+          setFiles(prev => addFileToTree(prev, newFolder));
+          return newFolder;
+    } catch (e) {
+        toast.error("An unexpected error occurred.");
+        return null;
+    }
   };
 
   const updateFile = async (fileId: string, updates: Partial<FileType>) => {
@@ -149,7 +177,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
         setActiveFile(updatedFile);
     }
     if (updates.isOpen === false && activeFile?._id === fileId) {
-      // Find another open file to make active
+      // Logic to switch active file is handled in component
     }
   };
 

@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Github, GitPullRequest, File as FileIcon, Folder, RefreshCw } from 'lucide-react'
+import { Github, GitPullRequest, File as FileIcon, Folder, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { useSession, signIn } from 'next-auth/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GitHubRepo, GitHubContentItem, GitHubBranch } from '@/types'
 import { useActiveView } from '@/hooks/use-active-view'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 
 export function GitHubView() {
   const { data: session } = useSession()
@@ -19,6 +18,7 @@ export function GitHubView() {
   const [branches, setBranches] = useState<GitHubBranch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('main')
   const [isLoading, setIsLoading] = useState(false)
+  const [isCommitting, setIsCommitting] = useState(false)
   const [prMessage, setPrMessage] = useState('')
   const { activeView } = useActiveView();
 
@@ -64,6 +64,57 @@ export function GitHubView() {
       setIsLoading(false)
     }
   }
+
+  const handleCommitAndPR = async () => {
+    if (!selectedRepo || !prMessage || isCommitting) return;
+    setIsCommitting(true);
+    
+    try {
+      const filesRes = await fetch('/api/files/flat');
+      if (!filesRes.ok) throw new Error('Could not fetch project files.');
+      const filesToCommit = await filesRes.json();
+
+      if (filesToCommit.length === 0) {
+        toast.info("There are no files to commit.");
+        return;
+      }
+
+      const res = await fetch('/api/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'commitAndPush',
+            owner: selectedRepo.owner.login,
+            repo: selectedRepo.name,
+            branch: selectedBranch,
+            message: prMessage,
+            files: filesToCommit
+        })
+      });
+
+      if (!res.ok) {
+        const { error } = await res.json();
+        throw new Error(error || 'Failed to create Pull Request.');
+      }
+
+      const { prUrl } = await res.json();
+      toast.success(
+        <div className="flex flex-col items-start">
+            <span>Pull Request created!</span>
+            <a href={prUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline text-primary">
+                View on GitHub
+            </a>
+        </div>
+      );
+      setPrMessage('');
+
+    } catch (error: any) {
+        toast.error(error.message);
+    } finally {
+        setIsCommitting(false);
+    }
+  };
+
 
   if (activeView !== 'github') {
     return null;
@@ -156,24 +207,18 @@ export function GitHubView() {
               onChange={(e) => setPrMessage(e.target.value)}
               className="bg-background border-input text-foreground mb-2"
             />
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div className='w-full'>
-                            <Button
-                                className="w-full bg-primary hover:bg-primary/90"
-                                disabled={true}
-                            >
-                                <GitPullRequest className="h-4 w-4 mr-2" />
-                                Commit & Create Pull Request
-                            </Button>
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>This is a demo feature and is not implemented.</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <Button
+                className="w-full bg-primary hover:bg-primary/90"
+                disabled={isCommitting || !prMessage.trim()}
+                onClick={handleCommitAndPR}
+            >
+                {isCommitting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                    <GitPullRequest className="h-4 w-4 mr-2" />
+                )}
+                {isCommitting ? 'Committing...' : 'Commit & Create Pull Request'}
+            </Button>
           </div>
         </div>
       )}

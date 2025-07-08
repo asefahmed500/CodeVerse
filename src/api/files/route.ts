@@ -44,13 +44,27 @@ export async function POST(request: Request) {
   }
 
   const { name, isFolder, parentId, language } = await request.json()
+  const userId = (session.user as any).id;
 
   try {
+    const existingFile = await File.findOne({
+      name,
+      parentId: parentId || null,
+      userId,
+    });
+
+    if (existingFile) {
+      return NextResponse.json(
+        { error: `A ${existingFile.isFolder ? 'folder' : 'file'} with the name "${name}" already exists.` }, 
+        { status: 409 }
+      );
+    }
+
     const newFile = new File({
       name,
       isFolder,
       parentId: parentId || null,
-      userId: (session.user as any).id,
+      userId,
       language: isFolder ? undefined : (language || "plaintext"),
       isActive: !isFolder
     })
@@ -66,7 +80,7 @@ export async function POST(request: Request) {
     if (!isFolder) {
       await File.updateMany(
         { 
-          userId: (session.user as any).id,
+          userId,
           isActive: true,
           _id: { $ne: newFile._id }
         },
@@ -141,9 +155,10 @@ export async function DELETE(request: Request) {
   }
 
   const { fileId } = await request.json()
+  const userId = (session.user as any).id;
 
   try {
-    const file = await File.findOne({ _id: fileId, userId: (session.user as any).id })
+    const file = await File.findOne({ _id: fileId, userId: userId })
     if (!file) {
       return NextResponse.json({ error: "File not found" }, { status: 404 })
     }
@@ -172,11 +187,11 @@ export async function DELETE(request: Request) {
 
     let newActiveFileId = null;
     if (file.isActive) {
-      const openFiles = await File.find({ userId: (session.user as any).id, isFolder: false, isOpen: true, _id: { $ne: fileId } }).sort({updatedAt: -1});
+      const openFiles = await File.find({ userId, isFolder: false, isOpen: true, _id: { $ne: fileId } }).sort({updatedAt: -1});
       let nextActiveFile = openFiles[0];
       
       if (!nextActiveFile) {
-        nextActiveFile = await File.findOne({ userId: (session.user as any).id, isFolder: false, _id: { $ne: fileId } }).sort({updatedAt: -1});
+        nextActiveFile = await File.findOne({ userId, isFolder: false, _id: { $ne: fileId } }).sort({updatedAt: -1});
       }
 
       if (nextActiveFile) {
