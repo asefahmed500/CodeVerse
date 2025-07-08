@@ -1,15 +1,35 @@
 'use client';
 
+import { Play } from 'lucide-react';
 import { useFileSystem } from '@/hooks/use-file-system';
+import { useTerminalStore } from '@/hooks/use-terminal-store';
+import { useActiveView } from '@/hooks/use-active-view';
 import type { Session } from 'next-auth';
 import { CommandPalette } from './command-palette';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 export function TitleBar({ session }: { session: Session | null }) {
-  const { activeFile } = useFileSystem();
+  const { activeFile, getPathForFile } = useFileSystem();
+  const { runCommand } = useTerminalStore();
+  const { openView } = useActiveView();
 
   const title = activeFile
     ? `${activeFile.name} - CodeVerse`
     : 'CodeVerse';
+  
+  const isRunnable = activeFile && !activeFile.isFolder && (activeFile.name.endsWith('.js') || activeFile.name.endsWith('.ts'));
+
+  const handleRun = () => {
+    if (!activeFile) return;
+    const path = getPathForFile(activeFile._id);
+    if (path) {
+        openView('terminal');
+        runCommand(`node ${path}`);
+    } else {
+        toast.error("Could not determine file path to run.");
+    }
+  }
 
   return (
     <>
@@ -34,6 +54,11 @@ export function TitleBar({ session }: { session: Session | null }) {
         <span className="text-sm">{title}</span>
       </div>
       <div className="flex items-center no-drag-region pr-2">
+        {isRunnable && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-foreground mr-2" onClick={handleRun} title="Run Code">
+                <Play size={16} />
+            </Button>
+        )}
         {/* Fake window controls */}
         <div className="w-3 h-3 rounded-full bg-red-500 mx-1"></div>
         <div className="w-3 h-3 rounded-full bg-yellow-500 mx-1"></div>

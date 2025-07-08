@@ -77,6 +77,7 @@ interface FileSystemContextType {
   updateFile: (fileId: string, updates: Partial<FileType>) => Promise<void>;
   deleteFile: (fileId: string) => Promise<void>;
   refreshFiles: () => void;
+  getPathForFile: (fileId: string) => string;
 }
 
 const FileSystemContext = createContext<FileSystemContextType | undefined>(undefined);
@@ -109,6 +110,30 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchFiles();
   }, [fetchFiles]);
+  
+  const getPathForFile = useCallback((fileId: string): string => {
+    const allFiles: FileType[] = [];
+    const flatten = (fs: FileType[]) => {
+        fs.forEach(item => {
+            allFiles.push(item);
+            if(item.isFolder && item.children) flatten(item.children);
+        })
+    }
+    flatten(files);
+
+    const fileMap = new Map(allFiles.map(f => [f._id.toString(), f]));
+    
+    const buildPath = (fId: string): string => {
+        const file = fileMap.get(fId);
+        if (!file) return '';
+        if (!file.parentId) return `/${file.name}`;
+        const parentPath = buildPath(file.parentId.toString());
+        return parentPath === '/' ? `${parentPath}${file.name}` : `${parentPath}/${file.name}`;
+    };
+
+    return buildPath(fileId);
+  }, [files]);
+
 
   const createFile = async (name: string, parentId?: string) => {
     try {
@@ -255,6 +280,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     updateFile,
     deleteFile,
     refreshFiles: fetchFiles,
+    getPathForFile,
   };
 
   return React.createElement(FileSystemContext.Provider, { value }, children);

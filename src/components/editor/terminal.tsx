@@ -7,17 +7,21 @@ import "xterm/css/xterm.css";
 import type { FileType, TerminalSessionType } from "@/types";
 import { useTheme } from "next-themes";
 import { debounce } from "@/lib/utils";
+import { useTerminalStore } from "@/hooks/use-terminal-store";
+import { runJsCode } from "@/lib/code-runner";
 
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
 
 const findNodeByPath = (files: FileType[], path: string): { node: FileType | null, parent: FileType | null } => {
     if (path === '/') return { node: null, parent: null };
-    const parts = path.split('/').filter(p => p);
+    const parts = path.startsWith('/') ? path.substring(1).split('/') : path.split('/');
+    
     let currentNode: FileType | null = null;
     let parent: FileType | null = null;
     let currentChildren = files;
 
     for (const part of parts) {
+        if (!currentChildren) return { node: null, parent: null };
         const found = currentChildren.find(f => f.name === part);
         if (found) {
             parent = currentNode;
@@ -53,6 +57,7 @@ export function Terminal({
   const xterm = useRef<XTerminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const { theme } = useTheme();
+  const { commandToRun, commandProcessed } = useTerminalStore();
 
   const [currentPath, setCurrentPath] = useState('/');
   const [currentLine, setCurrentLine] = useState('');
@@ -63,26 +68,29 @@ export function Terminal({
       onUpdate(terminal._id, updates);
   }, 1000), [terminal._id, onUpdate]);
 
-  const executeCommand = (command: string) => {
+  const executeCommand = useCallback(async (command: string) => {
     if (!xterm.current) return;
 
     const [cmd, ...args] = command.trim().split(' ');
     const term = xterm.current;
     
-    const newHistory = [command, ...commandHistory];
-    setCommandHistory(newHistory);
-    debouncedUpdate({ commands: newHistory });
+    if(command.trim()){
+        const newHistory = [command.trim(), ...commandHistory];
+        setCommandHistory(newHistory);
+        debouncedUpdate({ commands: newHistory });
+    }
 
     switch (cmd) {
         case 'help':
             term.writeln('\r\nAvailable commands:');
-            term.writeln('  ls       - List directory contents');
-            term.writeln('  cd [dir] - Change directory');
-            term.writeln('  cat [file] - Display file content');
-            term.writeln('  pwd      - Print working directory');
-            term.writeln('  echo     - Display a line of text');
-            term.writeln('  clear    - Clear the terminal screen');
-            term.writeln('  help     - Show this help message');
+            term.writeln('  ls           - List directory contents');
+            term.writeln('  cd [dir]     - Change directory');
+            term.writeln('  cat [file]   - Display file content');
+            term.writeln('  pwd          - Print working directory');
+            term.writeln('  echo [text]  - Display a line of text');
+            term.writeln('  node [file]  - Execute a JavaScript file');
+            term.writeln('  clear        - Clear the terminal screen');
+            term.writeln('  help         - Show this help message');
             break;
         case 'ls':
             const children = getChildrenOfPath(files, currentPath);
@@ -135,13 +143,33 @@ export function Terminal({
         case 'clear':
             term.clear();
             break;
+        case 'node':
+            const pathArg = args[0];
+            if (!pathArg) {
+                term.writeln('\r\nnode: missing file path');
+                break;
+            }
+            const { node: fileToRun } = findNodeByPath(files, pathArg);
+
+            if (fileToRun && !fileToRun.isFolder) {
+                const { logs, error } = await runJsCode(fileToRun.content);
+                term.writeln('');
+                logs.forEach(log => term.writeln(`\r${log}`));
+                if (error) {
+                    term.writeln(`\r\x1b[1;31mExecution failed: ${error}\x1b[0m`);
+                }
+            } else {
+                term.writeln(`\r\nnode: file not found: ${pathArg}`);
+            }
+            break;
         case '':
             break;
         default:
             term.writeln(`\r\nCommand not found: ${cmd}. Type 'help' for a list of commands.`);
             break;
     }
-  }
+  }, [commandHistory, currentPath, debouncedUpdate, files]);
+
 
   useEffect(() => {
     if (!terminalRef.current || xterm.current) return;
@@ -162,12 +190,10 @@ export function Terminal({
         
         switch (e) {
             case '\r': // Enter
-                xterm.current.write(prompt(currentPath));
-                if (currentLine.trim()) {
-                    executeCommand(currentLine);
-                }
+                executeCommand(currentLine);
                 setCurrentLine('');
                 setHistoryIndex(-1);
+                xterm.current.write(prompt(currentPath));
                 break;
             case '\u007F': // Backspace
                 if (currentLine.length > 0) {
@@ -233,6 +259,18 @@ export function Terminal({
         };
     }
   }, [theme]);
+  
+  useEffect(() => {
+    if (commandToRun && xterm.current) {
+      xterm.current.writeln(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun}\x1b[0m`);
+      executeCommand(commandToRun);
+      commandProcessed();
+      setTimeout(() => {
+        xterm.current?.write(prompt(currentPath));
+        xterm.current?.focus();
+      }, 100);
+    }
+  }, [commandToRun, commandProcessed, executeCommand, currentPath]);
 
   return (
     <div ref={terminalRef} className="h-full w-full p-2" />
