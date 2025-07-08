@@ -5,6 +5,7 @@ import { TitleBar } from "@/components/editor/title-bar";
 import { EditorTabs } from "@/components/editor/editor-tabs";
 import { MobileSidebar } from "@/components/editor/mobile-sidebar";
 import { KeyboardShortcuts } from "@/components/editor/keyboard-shortcuts";
+import { CommandPalette } from "@/components/editor/command-palette";
 
 export default function EditorLayout({
   children,
@@ -14,6 +15,7 @@ export default function EditorLayout({
   return (
     <>
       <KeyboardShortcuts />
+      <CommandPalette />
       <MobileSidebar />
       <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
         <TitleBar />

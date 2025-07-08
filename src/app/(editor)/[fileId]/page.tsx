@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useFileSystem } from "@/hooks/use-file-system";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -11,6 +11,7 @@ import {
 import { SidebarView } from "@/components/editor/sidebar-view";
 import { useSidebarStore } from "@/hooks/use-sidebar-store";
 import dynamic from "next/dynamic";
+import type { FileType } from "@/types";
 
 const CodeEditor = dynamic(
   () => import("@/components/editor/code-editor").then((mod) => mod.CodeEditor),
@@ -28,10 +29,18 @@ export default function EditorFilePage() {
   const params = useParams();
   const fileId = params.fileId as string;
   const router = useRouter();
-  const { updateFile, findFile, loading } = useFileSystem();
+  const { updateFile, findFile, loading, setActiveFileId } = useFileSystem();
   const { isCollapsed, setCollapsed } = useSidebarStore();
 
   const fileToRender = findFile(fileId);
+
+  const syncFileState = useCallback(() => {
+    if (fileToRender && (!fileToRender.isOpen || !fileToRender.isActive)) {
+      updateFile(fileId, { isOpen: true, isActive: true });
+    }
+    setActiveFileId(fileId);
+  }, [fileToRender, updateFile, fileId, setActiveFileId]);
+
 
   useEffect(() => {
     if (loading) return;
@@ -41,14 +50,12 @@ export default function EditorFilePage() {
         router.replace('/editor');
         return;
       }
-      
-      if (!fileToRender.isOpen || !fileToRender.isActive) {
-        updateFile(fileId, { isOpen: true, isActive: true });
-      }
+      syncFileState();
     } else {
+      // If the file doesn't exist in the store after loading, redirect.
       router.replace('/editor');
     }
-  }, [fileId, fileToRender, loading, router, updateFile]);
+  }, [fileId, fileToRender, loading, router, syncFileState]);
 
   if (loading || !fileToRender || fileToRender.isFolder) {
     return (
@@ -74,7 +81,7 @@ export default function EditorFilePage() {
       </ResizablePanel>
       <ResizableHandle withHandle className="hidden md:flex" />
       <ResizablePanel defaultSize={80}>
-        <CodeEditor file={fileToRender} key={fileToRender._id} />
+        <CodeEditor file={fileToRender as FileType} key={fileToRender._id} />
       </ResizablePanel>
     </ResizablePanelGroup>
   );

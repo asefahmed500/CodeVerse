@@ -68,26 +68,46 @@ function CloneView() {
 }
 
 function CommitView() {
-    // This is a placeholder as simulated commits are not part of the backend implementation
-    const { files } = useFileSystem();
+    const { allFiles, findFile } = useFileSystem();
     const router = useRouter();
+    const [commitMessage, setCommitMessage] = useState('');
+
+    // This is a simulation, so we'll just list all files as "changes"
+    const changedFiles = allFiles; 
 
     const handleFileClick = (file: FileType) => {
         if (!file.isFolder) {
             router.push(`/editor/${file._id}`);
         }
     }
+    
+    const handleCommit = () => {
+        if (!commitMessage.trim()) {
+            toast.error("Please enter a commit message.");
+            return;
+        }
+        // In a real app, this would trigger a git commit and push.
+        // Here, we just show a success message as per the requirements.
+        toast.success("Changes committed (simulation).");
+        setCommitMessage('');
+    }
 
     return (
-        <div className="flex-1 flex flex-col p-4">
-            <p className="text-sm text-muted-foreground">
-                Source control is managed via direct commits to your repository.
-                This view shows all files in your current workspace.
-            </p>
-            <div className="flex-1 overflow-y-auto p-2 mt-4 border-t border-border">
-                <h4 className="font-medium text-sm mb-2">Workspace Files ({files.length})</h4>
+        <div className="flex-1 flex flex-col p-2 space-y-4">
+            <div>
+                <Input 
+                    placeholder="Commit message" 
+                    value={commitMessage}
+                    onChange={(e) => setCommitMessage(e.target.value)}
+                />
+                <Button className="w-full mt-2" onClick={handleCommit} disabled={!commitMessage.trim()}>
+                    Commit (Simulation)
+                </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 border-t border-border">
+                <h4 className="font-medium text-sm mb-2">Changes ({changedFiles.length})</h4>
                 <ul>
-                    {files.map(file => (
+                    {changedFiles.map(file => (
                         <li
                             key={file._id}
                             className="flex items-center gap-2 p-1 rounded-md hover:bg-accent cursor-pointer"

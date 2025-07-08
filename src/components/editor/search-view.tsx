@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { X, ChevronRight, ReplaceAll } from 'lucide-react'
@@ -55,8 +55,9 @@ export function SearchView() {
   const { searchFiles, replaceInFiles } = useFileSystem()
   const { activeView } = useActiveView();
 
-  const debouncedSearch = useDebounceCallback((searchQuery: string) => {
-    setResults(searchFiles(searchQuery));
+  const debouncedSearch = useDebounceCallback(async (searchQuery: string) => {
+    const searchResults = await searchFiles(searchQuery);
+    setResults(searchResults);
   }, 500);
 
   const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,14 +66,9 @@ export function SearchView() {
     debouncedSearch(newQuery);
   }
   
-  const handleReplaceAll = () => {
+  const handleReplaceAll = async () => {
     if (!query || results.length === 0) return;
-    const { filesUpdated, replacements } = replaceInFiles(query, replaceQuery);
-    if (filesUpdated > 0) {
-      toast.success(`Replaced ${replacements} instance(s) in ${filesUpdated} file(s).`);
-    } else {
-      toast.info("No occurrences found to replace.");
-    }
+    await replaceInFiles(query, replaceQuery);
     setQuery('');
     setResults([]);
   };

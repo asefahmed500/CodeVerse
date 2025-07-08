@@ -13,7 +13,7 @@ const Terminal = dynamic(
 );
 
 export function TerminalManager() {
-  const { files } = useFileSystem();
+  const { allFiles } = useFileSystem();
   const { terminals, activeTerminalId, addTerminal, removeTerminal, setActiveTerminalId, updateTerminal } = useTerminalManager();
 
   return (
@@ -51,7 +51,7 @@ export function TerminalManager() {
             className={`h-full absolute top-0 left-0 w-full transition-opacity ${activeTerminalId === terminal._id ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
           >
              {activeTerminalId === terminal._id && (
-                <Terminal terminal={terminal} onUpdate={updateTerminal} files={files} />
+                <Terminal terminal={terminal} onUpdate={updateTerminal} files={allFiles} />
              )}
           </div>
         ))}

@@ -28,8 +28,8 @@ export function MainMenuBar() {
 
   const activeFile = findFile(activeFileId || '');
 
-  const handleNewFile = () => {
-    const newFile = createFile('Untitled.js');
+  const handleNewFile = async () => {
+    const newFile = await createFile('Untitled.js');
     if (newFile) {
         router.push(`/editor/${newFile._id}`);
     }
@@ -43,7 +43,8 @@ export function MainMenuBar() {
         const blob = new Blob([activeFile.content], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
-        URL.revokeObjectURL(url);
+        // It's better to let the browser manage the blob URL lifecycle
+        // URL.revokeObjectURL(url); 
         return;
     }
 

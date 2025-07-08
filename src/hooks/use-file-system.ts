@@ -2,14 +2,14 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { v4 as uuidv4 } from 'uuid';
 import type { FileType, SearchResult, SearchMatch } from '@/types';
 import { toast } from 'sonner';
-import { useEffect, useState, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { getLanguageConfigFromFilename } from '@/config/languages';
+import { produce } from 'immer';
 
 // Helper to get a flattened list of all files
-const flattenFiles = (files: FileType[]): FileType[] => {
+const getFlatFiles = (files: FileType[]): FileType[] => {
     const allFiles: FileType[] = [];
     const recursion = (fs: FileType[]) => {
         fs.forEach(item => {
@@ -21,21 +21,36 @@ const flattenFiles = (files: FileType[]): FileType[] => {
     return allFiles;
 }
 
+// Find a node and its parent in the tree
+const findNodeWithParent = (files: FileType[], fileId: string): { node: FileType | null, parent: FileType | null } => {
+    for (const file of files) {
+        if (file._id === fileId) return { node: file, parent: null };
+        if (file.isFolder && file.children) {
+            for (const child of file.children) {
+                if (child._id === fileId) return { node: child, parent: file };
+                const found = findNodeWithParent([child], fileId);
+                if(found.node) return found;
+            }
+        }
+    }
+    return { node: null, parent: null };
+};
+
+
 interface FileSystemState {
   files: FileType[];
   loading: boolean;
   activeFileId: string | null;
   expandedFolders: string[];
-  allFiles: FileType[]; // Derived state
+  allFiles: FileType[]; // Derived state, kept for quick lookups
   
   // Actions
   _setFiles: (files: FileType[]) => void;
-  fetchFiles: () => Promise<void>;
   findFile: (fileId: string) => FileType | null;
   getPathForFile: (fileId: string) => string;
   createFile: (name: string, parentId?: string) => Promise<FileType | null>;
   createFolder: (name: string, parentId?: string) => Promise<void>;
-  updateFile: (fileId: string, updates: Partial<FileType>) => Promise<void>;
+  updateFile: (fileId: string, updates: Partial<FileType>, options?: { optimistic?: boolean, noUpdate?: boolean }) => Promise<void>;
   deleteFile: (fileId: string) => Promise<void>;
   setActiveFileId: (fileId: string | null) => void;
   toggleFolder: (folderId: string) => void;
@@ -49,32 +64,18 @@ const useFileSystemStore = create<FileSystemState>()(
   persist(
     (set, get) => ({
       files: [],
-      loading: true,
+      loading: false, // Start with false for local storage
       activeFileId: null,
       expandedFolders: [],
       allFiles: [],
 
       _setFiles: (files: FileType[]) => {
-        const allFiles = flattenFiles(files);
+        const allFiles = getFlatFiles(files);
         set({ files, allFiles });
       },
 
-      fetchFiles: async () => {
-        set({ loading: true });
-        try {
-          const res = await fetch('/api/files');
-          if (!res.ok) throw new Error('Failed to fetch files');
-          const files = await res.json();
-          get()._setFiles(files);
-        } catch (error: any) {
-          toast.error(error.message);
-          get()._setFiles([]);
-        } finally {
-          set({ loading: false });
-        }
-      },
-
       findFile: (fileId: string) => {
+        if (!fileId) return null;
         return get().allFiles.find(f => f._id === fileId) || null;
       },
       
@@ -84,91 +85,133 @@ const useFileSystemStore = create<FileSystemState>()(
             const file = fileMap.get(fId);
             if (!file) return '';
             if (!file.parentId) return `/${file.name}`;
-            const parentPath = buildPath(file.parentId);
+            const parent = fileMap.get(file.parentId);
+            if (!parent) return `/${file.name}`;
+            const parentPath = buildPath(parent._id);
             return parentPath === '/' ? `/${file.name}` : `${parentPath}/${file.name}`;
         };
         return buildPath(fileId);
       },
 
       createFile: async (name: string, parentId?: string) => {
-        try {
-          const res = await fetch('/api/files', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, isFolder: false, parentId, isOpen: true }),
-          });
-          const newFile = await res.json();
-          if (!res.ok) throw new Error(newFile.error);
-          
-          await get().fetchFiles(); // Re-fetch to get the latest state
-          set({ activeFileId: newFile._id });
-          toast.success(`File "${newFile.name}" created.`);
-          return newFile;
-        } catch (error: any) {
-          toast.error(error.message);
-          return null;
-        }
+        const newFile: FileType = {
+          _id: uuidv4(),
+          name,
+          content: '',
+          isFolder: false,
+          parentId: parentId || null,
+          language: getLanguageConfigFromFilename(name).monacoLanguage,
+          isOpen: true,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        set(produce(draft => {
+            const allFiles = getFlatFiles(draft.files);
+            allFiles.forEach(f => f.isActive = false); // Deactivate all other files
+            if (parentId) {
+                const parent = getFlatFiles(draft.files).find(f => f._id === parentId);
+                if (parent && parent.isFolder) {
+                    if (!parent.children) parent.children = [];
+                    parent.children.push(newFile);
+                }
+            } else {
+                draft.files.push(newFile);
+            }
+        }));
+        get()._setFiles(get().files); // Recalculate allFiles
+        
+        get().setActiveFileId(newFile._id);
+        toast.success(`File "${newFile.name}" created.`);
+        return newFile;
       },
 
       createFolder: async (name: string, parentId?: string) => {
-        try {
-          const res = await fetch('/api/files', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, isFolder: true, parentId }),
-          });
-          const newFolder = await res.json();
-          if (!res.ok) throw new Error(newFolder.error);
-          
-          await get().fetchFiles();
-          set(state => ({ expandedFolders: [...new Set([...state.expandedFolders, parentId || newFolder._id])] }));
-          toast.success(`Folder "${newFolder.name}" created.`);
-        } catch (error: any) {
-          toast.error(error.message);
-        }
+        const newFolder: FileType = {
+          _id: uuidv4(),
+          name,
+          content: '',
+          isFolder: true,
+          parentId: parentId || null,
+          language: 'plaintext',
+          isOpen: false,
+          isActive: false,
+          children: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+         set(produce(draft => {
+            if (parentId) {
+                const parent = getFlatFiles(draft.files).find(f => f._id === parentId);
+                if (parent && parent.isFolder) {
+                    if (!parent.children) parent.children = [];
+                    parent.children.push(newFolder);
+                }
+            } else {
+                draft.files.push(newFolder);
+            }
+        }));
+        get()._setFiles(get().files);
+        if (parentId) get().toggleFolder(parentId);
+        toast.success(`Folder "${newFolder.name}" created.`);
       },
       
-      updateFile: async (fileId: string, updates: Partial<FileType>) => {
-        try {
-          const res = await fetch('/api/files', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileId, ...updates }),
-          });
-          const updatedFile = await res.json();
-          if (!res.ok) throw new Error(updatedFile.error);
-          await get().fetchFiles();
-        } catch (error: any) {
-          toast.error(error.message);
-          await get().fetchFiles(); // Re-sync on error
+      updateFile: async (fileId: string, updates: Partial<FileType>, options = {}) => {
+        set(produce(draft => {
+            const file = getFlatFiles(draft.files).find(f => f._id === fileId);
+            if (file) {
+                Object.assign(file, updates, { updatedAt: new Date() });
+                
+                // If making active, deactivate others
+                if (updates.isActive) {
+                    getFlatFiles(draft.files).forEach(f => {
+                        if (f._id !== fileId) f.isActive = false;
+                    });
+                }
+            }
+        }));
+        if (!options.noUpdate) {
+            get()._setFiles(get().files);
         }
       },
 
       deleteFile: async (fileId: string) => {
         const fileToDelete = get().findFile(fileId);
         if (!fileToDelete) return;
-        
-        try {
-          const res = await fetch('/api/files', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileId }),
-          });
-          const { success, error, newActiveFileId } = await res.json();
-          if (!success) throw new Error(error);
 
-          await get().fetchFiles();
-          if(get().activeFileId === fileId) {
-            set({ activeFileId: newActiveFileId });
-          }
-          toast.success(`Deleted ${fileToDelete.name}.`);
-        } catch (error: any) {
-          toast.error(error.message);
+        set(produce(draft => {
+            const deleteRecursively = (id: string) => {
+                const { node, parent } = findNodeWithParent(draft.files, id);
+                if (!node) return;
+
+                if (node.isFolder && node.children) {
+                    [...node.children].forEach(child => deleteRecursively(child._id));
+                }
+                
+                const targetArray = parent ? parent.children : draft.files;
+                const index = targetArray.findIndex(f => f._id === id);
+                if (index > -1) {
+                    targetArray.splice(index, 1);
+                }
+            };
+            deleteRecursively(fileId);
+        }));
+
+        get()._setFiles(get().files); // Recalculate flat files
+        if (get().activeFileId === fileId) {
+            get().setActiveFileId(null);
         }
+        toast.success(`Deleted ${fileToDelete.name}.`);
       },
       
       setActiveFileId: (fileId: string | null) => {
+        if (get().activeFileId === fileId) return;
         set({ activeFileId: fileId });
+        if (fileId) {
+            get().updateFile(fileId, { isActive: true });
+        }
       },
 
       toggleFolder: (folderId: string) => {
@@ -182,38 +225,54 @@ const useFileSystemStore = create<FileSystemState>()(
 
       searchFiles: async (query: string): Promise<SearchResult[]> => {
           if (!query) return [];
-          try {
-            const res = await fetch('/api/search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
-            });
-            const { results } = await res.json();
-            return results;
-          } catch (error) {
-              toast.error("Search failed.");
-              return [];
+          const allFiles = get().allFiles;
+          const results: SearchResult[] = [];
+          const regex = new RegExp(query, 'gi');
+
+          for (const file of allFiles) {
+              if (file.isFolder) continue;
+
+              const contentMatches: SearchMatch[] = [];
+              if (file.content) {
+                  const lines = file.content.split('\n');
+                  lines.forEach((line, index) => {
+                      if (regex.test(line)) {
+                          contentMatches.push({ lineNumber: index + 1, lineContent: line });
+                      }
+                  });
+              }
+
+              if (regex.test(file.name) || contentMatches.length > 0) {
+                  results.push({ file, matches: contentMatches });
+              }
           }
+          return results;
       },
 
       replaceInFiles: async (query: string, replaceWith: string) => {
-        try {
-            const res = await fetch('/api/replace', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, replaceWith })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-            
-            await get().fetchFiles();
-            if (data.filesUpdated > 0) {
-              toast.success(`Replaced ${data.replacements} instance(s) in ${data.filesUpdated} file(s).`);
-            } else {
-              toast.info("No occurrences found to replace.");
-            }
-        } catch (error: any) {
-            toast.error(error.message);
+        const filesToUpdate = get().allFiles.filter(f => !f.isFolder && f.content && f.content.includes(query));
+        const regex = new RegExp(query, 'g');
+        
+        let totalReplacements = 0;
+        set(produce(draft => {
+            filesToUpdate.forEach(file => {
+                const originalContent = file.content;
+                const replacementCount = (originalContent.match(regex) || []).length;
+                if(replacementCount > 0){
+                    const liveFile = getFlatFiles(draft.files).find(f => f._id === file._id);
+                    if(liveFile) {
+                        liveFile.content = originalContent.replace(regex, replaceWith);
+                        totalReplacements += replacementCount;
+                    }
+                }
+            })
+        }));
+
+        get()._setFiles(get().files);
+        if (totalReplacements > 0) {
+            toast.success(`Replaced ${totalReplacements} instance(s) in ${filesToUpdate.length} file(s).`);
+        } else {
+            toast.info("No occurrences found to replace.");
         }
       },
       
@@ -230,23 +289,53 @@ const useFileSystemStore = create<FileSystemState>()(
               return;
             }
             
-            // This is a complex operation, ideally done on the backend
-            // For now, we'll clear the existing workspace and create new files
-            const existingFiles = get().allFiles;
-            for (const file of existingFiles) {
-                await get().deleteFile(file._id);
-            }
+            // Build file tree from flat path list
+            const newFileTree: FileType[] = [];
+            const dirMap = new Map<string, FileType>();
 
-            const flatRes = await fetch('/api/files/flat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ghFiles) });
-            if (!flatRes.ok) {
-              const err = await flatRes.json();
-              throw new Error(err.error || 'Failed to process repository files.');
-            }
+            for (const fileData of ghFiles) {
+                const parts = fileData.path.split('/');
+                let currentParentId: string | null = null;
+                let currentPath = '';
 
-            await get().fetchFiles();
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    currentPath = i === 0 ? part : `${currentPath}/${part}`;
+                    const isFolder = i < parts.length - 1;
+
+                    if (!dirMap.has(currentPath)) {
+                        const newItem: FileType = {
+                            _id: uuidv4(),
+                            name: part,
+                            content: isFolder ? '' : fileData.content,
+                            isFolder,
+                            parentId: currentParentId,
+                            language: isFolder ? 'plaintext' : getLanguageConfigFromFilename(part).monacoLanguage,
+                            isOpen: false,
+                            isActive: false,
+                            children: isFolder ? [] : undefined,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                        };
+                        dirMap.set(currentPath, newItem);
+
+                        const parent = currentParentId ? dirMap.get(parts.slice(0, i).join('/')) : null;
+                        if (parent) {
+                            parent.children?.push(newItem);
+                        } else {
+                            newFileTree.push(newItem);
+                        }
+                    }
+                    if (isFolder) {
+                        currentParentId = dirMap.get(currentPath)!._id;
+                    }
+                }
+            }
+            
+            set({ files: newFileTree, allFiles: Array.from(dirMap.values()) });
             const firstFile = get().allFiles.find(f => !f.isFolder);
             if(firstFile) {
-                set({ activeFileId: firstFile._id });
+                get().setActiveFileId(firstFile._id);
             }
         } catch (error: any) {
             toast.error(error.message);
@@ -256,33 +345,14 @@ const useFileSystemStore = create<FileSystemState>()(
       },
       
       reset: () => {
-        // Implement backend reset if needed
-        console.log("Resetting file system state");
-        set({ files: [], activeFileId: null, expandedFolders: [], allFiles: [] });
+        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [] });
       }
     }),
     {
-      name: 'codeverse-file-system-v2', 
-      storage: createJSONStorage(() => sessionStorage), // Use sessionStorage for non-persistent state between browser restarts
+      name: 'codeverse-file-system-local-v3', 
+      storage: createJSONStorage(() => localStorage), 
     }
   )
 );
 
-
-// Custom hook to initialize and use the store
-export const useFileSystem = () => {
-    const store = useFileSystemStore();
-    const { status, data: session } = useSession();
-    const router = useRouter();
-
-    useEffect(() => {
-      if (status === 'authenticated') {
-        store.fetchFiles();
-      } else if (status === 'unauthenticated') {
-        store.reset();
-        router.push('/editor');
-      }
-    }, [status, session, store.fetchFiles, store.reset, router]);
-
-    return store;
-}
+export const useFileSystem = useFileSystemStore;

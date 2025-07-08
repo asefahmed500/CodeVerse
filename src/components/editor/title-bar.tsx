@@ -4,7 +4,6 @@ import { Play, Menu } from 'lucide-react';
 import { useFileSystem } from '@/hooks/use-file-system';
 import { useTerminalStore } from '@/hooks/use-terminal-store';
 import { useActiveView } from '@/hooks/use-active-view';
-import { CommandPalette } from './command-palette';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getLanguageConfigFromFilename } from '@/config/languages';
@@ -33,7 +32,6 @@ export function TitleBar() {
         const blob = new Blob([activeFile.content], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
-        URL.revokeObjectURL(url);
         return;
     }
       
@@ -83,7 +81,6 @@ export function TitleBar() {
         </div>
       </div>
     </div>
-    <CommandPalette />
     </>
   );
 }

@@ -28,8 +28,8 @@ export function Explorer() {
     return null;
   }
   
-  const handleNewFile = () => {
-    const newFile = createFile('Untitled.js');
+  const handleNewFile = async () => {
+    const newFile = await createFile('Untitled.js');
     if (newFile) router.push(`/editor/${newFile._id}`);
   };
 
@@ -118,30 +118,30 @@ function FileTreeItem({
     if (trigger instanceof HTMLElement) trigger.click();
   }
 
-  const handleRename = () => {
+  const handleRename = async () => {
     if (!editingValue.trim() || editingValue === file.name) {
         setIsEditing(false);
         return;
     }
-    updateFile(file._id, { name: editingValue });
+    await updateFile(file._id, { name: editingValue });
     toast.success(`Renamed to ${editingValue}`);
     setIsEditing(false);
   };
   
-  const handleNewFile = (e: Event) => {
+  const handleNewFile = async (e: Event) => {
     e.preventDefault();
-    const newFile = createFile('Untitled.js', file._id);
+    const newFile = await createFile('Untitled.js', file._id);
     if(newFile) router.push(`/editor/${newFile._id}`);
   }
   
-  const handleNewFolder = (e: Event) => {
+  const handleNewFolder = async (e: Event) => {
     e.preventDefault();
-    createFolder('New Folder', file._id);
+    await createFolder('New Folder', file._id);
   }
 
-  const handleDelete = (e: Event) => {
+  const handleDelete = async (e: Event) => {
     e.preventDefault();
-    deleteFile(file._id);
+    await deleteFile(file._id);
   }
 
   const handleRenameClick = (e: Event) => {

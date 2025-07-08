@@ -14,20 +14,23 @@ import { getLanguageConfigFromFilename } from "@/config/languages";
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
 
 const findNodeByPath = (files: FileType[], path: string): { node: FileType | null, parent: FileType | null } => {
-    if (path === '/') return { node: null, parent: null };
+    const fileMap = new Map(files.map(f => [f._id, f]));
+    const rootFiles = files.filter(f => !f.parentId);
+
+    if (path === '/') return { node: { _id: 'root', name: '/', isFolder: true, children: rootFiles } as any, parent: null };
+    
     const parts = path.startsWith('/') ? path.substring(1).split('/') : path.split('/');
     
-    let currentNode: FileType | null = null;
+    let currentNode: FileType | null = { _id: 'root', name: '/', isFolder: true, children: rootFiles } as any;
     let parent: FileType | null = null;
-    let currentChildren = files;
-
+    
     for (const part of parts) {
-        if (!currentChildren) return { node: null, parent: null };
-        const found = currentChildren.find(f => f.name === part);
+        if (!currentNode || !currentNode.isFolder || !currentNode.children) return { node: null, parent: null };
+        const children = currentNode.children.map(c => typeof c === 'string' ? fileMap.get(c) : c).filter(Boolean) as FileType[];
+        const found = children.find(f => f.name === part);
         if (found) {
             parent = currentNode;
             currentNode = found;
-            currentChildren = found.children || [];
         } else {
             return { node: null, parent: null };
         }
@@ -36,10 +39,10 @@ const findNodeByPath = (files: FileType[], path: string): { node: FileType | nul
 }
 
 const getChildrenOfPath = (files: FileType[], path: string): FileType[] => {
-    if (path === '/') return files;
+    const fileMap = new Map(files.map(f => [f._id, f]));
     const { node } = findNodeByPath(files, path);
-    if (node && node.isFolder) {
-        return node.children || [];
+    if (node && node.isFolder && node.children) {
+        return node.children.map(c => typeof c === 'string' ? fileMap.get(c) : c).filter(Boolean) as FileType[];
     }
     return [];
 }
@@ -262,15 +265,17 @@ export function Terminal({
   useEffect(() => {
     if (xterm.current) {
         xterm.current.options.theme = theme === 'dark' ? {
-            background: "#1e1e1e",
-            foreground: "#cccccc",
-            cursor: "#ffffff",
-            selection: "#555555"
+            background: "hsl(var(--background))",
+            foreground: "hsl(var(--foreground))",
+            cursor: "hsl(var(--foreground))",
+            selectionBackground: "hsl(var(--accent))",
+            selectionForeground: "hsl(var(--accent-foreground))"
         } : {
-            background: "#ffffff",
-            foreground: "#333333",
-            cursor: "#000000",
-            selection: "#dddddd"
+            background: "hsl(var(--background))",
+            foreground: "hsl(var(--foreground))",
+            cursor: "hsl(var(--foreground))",
+            selectionBackground: "hsl(var(--accent))",
+            selectionForeground: "hsl(var(--accent-foreground))"
         };
     }
   }, [theme]);

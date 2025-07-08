@@ -24,22 +24,34 @@ export function CodeEditor({ file }: { file: FileType }) {
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
 
+  // We use `useRef` to hold the latest file content to prevent the debounced
+  // function from capturing a stale closure.
+  const fileContentRef = useRef(file.content);
+  useEffect(() => {
+    fileContentRef.current = file.content;
+  }, [file.content]);
+  
   const immediateSave = useCallback((currentContent: string) => {
-    updateFile(file._id, { content: currentContent });
+    updateFile(file._id, { content: currentContent }, { optimistic: true });
     toast.success(`${file.name} saved.`);
   }, [file._id, file.name, updateFile]);
   
-  const debouncedSave = useCallback(debounce(immediateSave, 2000), [immediateSave]);
+  const debouncedSave = useCallback(debounce(() => {
+    // When the debounced function runs, it reads the latest content from the ref.
+    updateFile(file._id, { content: fileContentRef.current });
+  }, 2000), [file._id, updateFile]);
 
   const handleEditorChange: OnChange = (value) => {
     const newContent = value || "";
-    // Optimistically update local file object to avoid re-fetch
-    file.content = newContent; 
-    debouncedSave(newContent);
+    fileContentRef.current = newContent;
+    updateFile(file._id, { content: newContent }, { optimistic: true, noUpdate: true });
+    debouncedSave();
   };
   
+  // Effect to set up the manual save handler
   useEffect(() => {
     const handler = () => {
+      // Use the most recent content from the file object
       immediateSave(file.content);
     };
     setSaveHandler(() => handler);
