@@ -1,40 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useActiveView } from "@/hooks/use-active-view";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
+import { usePanelStore } from "@/hooks/use-panel-store";
 
 const TerminalManager = dynamic(
-  () => import('./terminal-manager').then(mod => mod.TerminalManager),
-  { ssr: false, loading: () => <p className="p-2 text-sm">Loading Terminal...</p> }
+  () => import("./terminal-manager").then((mod) => mod.TerminalManager),
+  {
+    ssr: false,
+    loading: () => <p className="p-2 text-sm">Loading Terminal...</p>,
+  }
 );
 
 export function Panel() {
   const { activeView, setActiveView } = useActiveView();
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const { isCollapsed, setCollapsed } = usePanelStore();
 
   const isTerminalActive = activeView === "terminal";
 
+  // This effect syncs the panel's visual state to the active view.
+  // If the terminal view is activated elsewhere (e.g. shortcut, menu), the panel opens.
+  // If the view is changed away from terminal, the panel closes.
   useEffect(() => {
     if (isTerminalActive && isCollapsed) {
-      setIsCollapsed(false);
+      setCollapsed(false);
+    } else if (!isTerminalActive && !isCollapsed) {
+      setCollapsed(true);
     }
-  }, [isTerminalActive, isCollapsed]);
+  }, [isTerminalActive, isCollapsed, setCollapsed]);
 
-
-  const handleTabClick = () => {
-    if(isTerminalActive) {
-      if (isCollapsed) {
-        setIsCollapsed(false);
-      }
-    } else {
-      setActiveView('terminal');
-      setIsCollapsed(false);
-    }
-  }
+  const togglePanelVisibility = () => {
+    setActiveView(isTerminalActive ? null : "terminal");
+  };
 
   return (
     <div
@@ -51,7 +52,7 @@ export function Panel() {
             <TabsTrigger
               value="terminal"
               className="h-full text-xs rounded-none border-t-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3"
-              onClick={handleTabClick}
+              onClick={togglePanelVisibility}
             >
               TERMINAL
             </TabsTrigger>
@@ -62,7 +63,7 @@ export function Panel() {
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-foreground hover:bg-accent"
-              onClick={() => setIsCollapsed(!isCollapsed)}
+              onClick={togglePanelVisibility}
             >
               {isCollapsed ? (
                 <ChevronUp className="h-4 w-4" />
@@ -74,12 +75,7 @@ export function Panel() {
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-foreground hover:bg-accent"
-              onClick={() => {
-                setIsCollapsed(true);
-                if (isTerminalActive) {
-                    setActiveView(null);
-                }
-              }}
+              onClick={() => setActiveView(null)}
             >
               <X className="h-4 w-4" />
             </Button>

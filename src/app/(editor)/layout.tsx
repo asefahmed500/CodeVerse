@@ -6,6 +6,7 @@ import { TitleBar } from "@/components/editor/title-bar";
 import { FileSystemProvider } from "@/hooks/use-file-system";
 import { EditorTabs } from "@/components/editor/editor-tabs";
 import { MobileSidebar } from "@/components/editor/mobile-sidebar";
+import { KeyboardShortcuts } from "@/components/editor/keyboard-shortcuts";
 
 export default async function EditorLayout({
   children,
@@ -16,6 +17,7 @@ export default async function EditorLayout({
 
   return (
     <FileSystemProvider>
+      <KeyboardShortcuts />
       <MobileSidebar />
       <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
         <TitleBar session={session} />

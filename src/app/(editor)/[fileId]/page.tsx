@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/resizable";
 import type { FileType } from "@/types";
 import { SidebarView } from "@/components/editor/sidebar-view";
+import { useSidebarStore } from "@/hooks/use-sidebar-store";
 
 function findFileInTree(files: FileType[], fileId: string): FileType | null {
   for (const file of files) {
@@ -33,6 +34,7 @@ export default function EditorFilePage() {
   const fileId = params.fileId as string;
   const router = useRouter();
   const { files, updateFile, loading, activeFile, setActiveFile } = useFileSystem();
+  const { isCollapsed, setCollapsed } = useSidebarStore();
 
   useEffect(() => {
     if (loading) return;
@@ -65,7 +67,16 @@ export default function EditorFilePage() {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="flex-1">
-      <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="bg-card hidden md:block">
+      <ResizablePanel
+        defaultSize={20}
+        minSize={15}
+        maxSize={30}
+        className="bg-card hidden md:block"
+        collapsible={true}
+        collapsed={isCollapsed}
+        onCollapse={() => setCollapsed(true)}
+        onExpand={() => setCollapsed(false)}
+      >
         <SidebarView />
       </ResizablePanel>
       <ResizableHandle withHandle className="hidden md:flex" />
