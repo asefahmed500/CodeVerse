@@ -55,7 +55,7 @@ interface FileSystemState {
   toggleFolder: (folderId: string) => void;
   searchFiles: (query: string) => Promise<SearchResult[]>;
   replaceInFiles: (query: string, replaceWith: string) => Promise<void>;
-  setWorkspaceFromGitHub: (owner: string, repo: string) => Promise<void>;
+  setWorkspaceFromGitHub: (owner: string, repo: string) => Promise<{ firstFileId: string | null } | void>;
   reset: () => void; // This will now be a server-side action
 }
 
@@ -210,19 +210,22 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const fileToDelete = get().findFile(fileId);
         if (!fileToDelete) return { nextActiveFileId: null };
 
+        let nextActiveFileId: string | null = get().activeFileId;
+        const wasActive = get().activeFileId === fileId;
+
+        if (wasActive) {
+            const openFiles = get().allFiles.filter(f => !f.isFolder && f.isOpen && f._id !== fileId);
+            openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            nextActiveFileId = openFiles[0]?._id ?? null;
+        }
+
         const res = await fetch(`/api/files?fileId=${fileId}`, { method: 'DELETE' });
         if (!res.ok) {
             toast.error("Failed to delete item.");
             return { nextActiveFileId: get().activeFileId };
         }
 
-        const openFiles = get().allFiles.filter(f => !f.isFolder && f.isOpen && f._id !== fileId);
-        openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        const nextActiveFileId = openFiles[0]?._id ?? null;
-
-        await get().fetchFiles(); // Refetch the entire tree
-        get().setActiveFileId(nextActiveFileId);
-
+        await get().fetchFiles();
         toast.success(`Deleted ${fileToDelete.name}.`);
         return { nextActiveFileId };
     },
@@ -380,9 +383,11 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             await get().fetchFiles();
             
             const firstFile = get().allFiles.find(f => !f.isFolder);
-            if (firstFile) get().setActiveFileId(firstFile._id);
+            const firstFileId = firstFile?._id ?? null;
+            get().setActiveFileId(firstFileId);
 
             toast.success(`Cloned ${repo} successfully.`, { id: toastId });
+            return { firstFileId };
         } catch (error: any) {
             toast.error(error.message, { id: toastId });
         } finally {

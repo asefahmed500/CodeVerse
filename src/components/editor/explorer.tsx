@@ -257,6 +257,7 @@ function FileTreeItem({
     const { nextActiveFileId } = await deleteFile(file._id);
     
     if (wasActive) {
+      setActiveFileId(nextActiveFileId);
       if (nextActiveFileId) {
         router.replace(`/editor/${nextActiveFileId}`);
       } else {

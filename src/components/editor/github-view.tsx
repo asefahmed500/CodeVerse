@@ -16,6 +16,7 @@ function CloneView() {
     const [repoUrl, setRepoUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const { setWorkspaceFromGitHub } = useFileSystem();
+    const router = useRouter();
 
     const handleClone = async () => {
         let owner, repo;
@@ -33,8 +34,12 @@ function CloneView() {
 
         setIsLoading(true);
         try {
-            await setWorkspaceFromGitHub(owner, repo);
-            // The file system hook will handle success toast
+            const result = await setWorkspaceFromGitHub(owner, repo);
+            if (result?.firstFileId) {
+                router.replace(`/editor/${result.firstFileId}`);
+            } else {
+                router.replace('/editor');
+            }
         } catch (error: any) {
             toast.error(error.message || "Failed to clone repository.");
         } finally {
