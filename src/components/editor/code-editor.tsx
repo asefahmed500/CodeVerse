@@ -1,7 +1,7 @@
 "use client";
 
 import Editor, { OnChange, type OnMount } from "@monaco-editor/react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
