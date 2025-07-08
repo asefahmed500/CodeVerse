@@ -188,7 +188,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     refreshFiles: fetchFiles,
   };
 
-  return <FileSystemContext.Provider value={value}>{children}</FileSystemContext.Provider>;
+  return React.createElement(FileSystemContext.Provider, { value: value }, children);
 }
 
 export const useFileSystem = () => {

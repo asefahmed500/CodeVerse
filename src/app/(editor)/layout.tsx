@@ -3,7 +3,7 @@ import { ActivityBar } from "@/components/editor/activity-bar";
 import { Panel } from "@/components/editor/panel";
 import { StatusBar } from "@/components/editor/status-bar";
 import { TitleBar } from "@/components/editor/title-bar";
-import { FileSystemProvider } from "@/app/_hooks/use-file-system";
+import { FileSystemProvider } from "@/hooks/use-file-system";
 import { EditorTabs } from "@/components/editor/editor-tabs";
 
 export default async function EditorLayout({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useFileSystem } from '@/app/_hooks/use-file-system';
+import { useFileSystem } from '@/hooks/use-file-system';
 import type { Session } from 'next-auth';
 
 export function TitleBar({ session }: { session: Session | null }) {

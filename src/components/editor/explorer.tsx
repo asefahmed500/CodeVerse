@@ -2,7 +2,7 @@
 
 import { ChevronRight, ChevronDown, FolderPlus, FilePlus, RefreshCw, X, Pencil } from "lucide-react";
 import React, { useState } from "react";
-import { useFileSystem } from "@/app/_hooks/use-file-system";
+import { useFileSystem } from "@/hooks/use-file-system";
 import { useRouter } from "next/navigation";
 import type { FileType } from "@/types";
 import { useActiveView } from "@/hooks/use-active-view";

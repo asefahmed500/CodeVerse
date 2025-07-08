@@ -1,7 +1,7 @@
 'use client'
 
 import { GitBranch, CircleDot, Check } from 'lucide-react'
-import { useFileSystem } from '@/app/_hooks/use-file-system'
+import { useFileSystem } from '@/hooks/use-file-system'
 import { getLanguageFromFilename } from '@/config/languages'
 
 export function StatusBar() {

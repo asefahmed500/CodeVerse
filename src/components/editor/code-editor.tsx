@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { EDITOR_CONFIG } from "@/config/editor";
 import { getLanguageFromFilename } from "@/config/languages";
-import { useFileSystem } from "@/app/_hooks/use-file-system";
+import { useFileSystem } from "@/hooks/use-file-system";
 import { debounce } from "@/lib/utils";
 
 export function CodeEditor({ file }: { file: FileType }) {

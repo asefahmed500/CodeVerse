@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { useFileSystem } from '@/app/_hooks/use-file-system'
+import { useFileSystem } from '@/hooks/use-file-system'
 import { useRouter } from 'next/navigation'
 import type { FileType } from '@/types'
 import { getLanguageFromFilename } from '@/config/languages'

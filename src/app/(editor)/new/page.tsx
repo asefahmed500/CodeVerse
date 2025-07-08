@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useFileSystem } from "@/app/_hooks/use-file-system";
+import { useFileSystem } from "@/hooks/use-file-system";
 import { toast } from "sonner";
 
 export default function NewFilePage() {

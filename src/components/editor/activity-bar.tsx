@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { Button } from "@/components/ui/button";
-import { useActiveView } from "@/app/_hooks/use-active-view";
+import { useActiveView } from "@/hooks/use-active-view";
 import {
   Tooltip,
   TooltipContent,

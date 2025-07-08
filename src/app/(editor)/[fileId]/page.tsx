@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { CodeEditor } from "@/components/editor/code-editor";
-import { useFileSystem } from "@/app/_hooks/use-file-system";
+import { useFileSystem } from "@/hooks/use-file-system";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import {
