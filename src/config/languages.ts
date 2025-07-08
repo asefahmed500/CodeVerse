@@ -52,30 +52,35 @@ export const LANGUAGE_CONFIG: Record<string, {
     extensions: [".cs"],
     monacoLanguage: "csharp",
     judge0Id: 51, // C# (Mono 6.6.0.161)
+    runner: "run-csharp",
   },
   go: {
     name: "Go",
     extensions: [".go"],
     monacoLanguage: "go",
     judge0Id: 60, // Go (1.13.5)
+    runner: "run-go",
   },
   php: {
     name: "PHP",
     extensions: [".php"],
     monacoLanguage: "php",
     judge0Id: 70, // PHP (7.4.1)
+    runner: "run-php",
   },
   ruby: {
     name: "Ruby",
     extensions: [".rb"],
     monacoLanguage: "ruby",
     judge0Id: 72, // Ruby (2.7.0)
+    runner: "run-ruby",
   },
   rust: {
     name: "Rust",
     extensions: [".rs"],
     monacoLanguage: "rust",
     judge0Id: 73, // Rust (1.40.0)
+    runner: "run-rust",
   },
   html: {
     name: "HTML",

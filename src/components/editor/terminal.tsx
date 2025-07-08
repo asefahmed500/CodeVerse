@@ -90,18 +90,24 @@ export function Terminal({
     switch (cmd) {
         case 'help':
             term.writeln('\r\nAvailable commands:');
-            term.writeln('  ls           - List directory contents');
-            term.writeln('  cd [dir]     - Change directory');
-            term.writeln('  cat [file]   - Display file content');
-            term.writeln('  pwd          - Print working directory');
-            term.writeln('  echo [text]  - Display a line of text');
-            term.writeln('  node [file]  - Execute a JS/TS file');
-            term.writeln('  python [file]- Execute a Python file');
+            term.writeln('  ls              - List directory contents');
+            term.writeln('  cd [dir]        - Change directory');
+            term.writeln('  cat [file]      - Display file content');
+            term.writeln('  pwd             - Print working directory');
+            term.writeln('  echo [text]     - Display a line of text');
+            term.writeln('  clear           - Clear the terminal screen');
+            term.writeln('  help            - Show this help message');
+            term.writeln('\r\nExecution commands:');
+            term.writeln('  node [file]     - Execute a JS/TS file');
+            term.writeln('  python [file]   - Execute a Python file');
             term.writeln('  run-java [file] - Compile and run a Java file');
-            term.writeln('  run-c [file] - Compile and run a C file');
-            term.writeln('  run-cpp [file] - Compile and run a C++ file');
-            term.writeln('  clear        - Clear the terminal screen');
-            term.writeln('  help         - Show this help message');
+            term.writeln('  run-c [file]    - Compile and run a C file');
+            term.writeln('  run-cpp [file]  - Compile and run a C++ file');
+            term.writeln('  run-csharp [file]- Compile and run a C# file');
+            term.writeln('  run-go [file]   - Compile and run a Go file');
+            term.writeln('  run-php [file]  - Execute a PHP file');
+            term.writeln('  run-ruby [file] - Execute a Ruby file');
+            term.writeln('  run-rust [file] - Compile and run a Rust file');
             break;
         case 'ls':
             const children = getChildrenOfPath(allFiles, currentPath);
@@ -159,6 +165,11 @@ export function Terminal({
         case 'run-java':
         case 'run-c':
         case 'run-cpp':
+        case 'run-csharp':
+        case 'run-go':
+        case 'run-php':
+        case 'run-ruby':
+        case 'run-rust':
             const pathArg = args[0];
             if (!pathArg) {
                 term.writeln(`\r\n${cmd}: missing file path`);
