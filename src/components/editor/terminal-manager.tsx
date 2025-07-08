@@ -1,17 +1,50 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Terminal } from './terminal'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Plus, X } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import type { TerminalSessionType } from '@/types'
 
+const Terminal = dynamic(
+  () => import('./terminal').then((mod) => mod.Terminal), 
+  { ssr: false, loading: () => <p className="p-2 text-sm">Loading Terminal...</p> }
+);
+
 export function TerminalManager() {
   const { data: session } = useSession()
   const [terminals, setTerminals] = useState<TerminalSessionType[]>([])
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null)
+
+  const updateTerminal = useCallback(async (terminalId: string, updates: Partial<TerminalSessionType>) => {
+    if (!terminalId) return
+    try {
+      await fetch(`/api/terminal`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ terminalId, ...updates })
+      })
+    } catch (error) {
+      console.error('Failed to update terminal:', error)
+    }
+  }, [])
+
+  const addTerminal = useCallback(async () => {
+    try {
+      const response = await fetch('/api/terminal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: `Terminal ${terminals.length + 1}` })
+      })
+      const newTerminal = await response.json()
+      setTerminals(prev => [...prev, newTerminal])
+      setActiveTerminalId(newTerminal._id)
+    } catch (error) {
+      toast.error('Failed to create terminal')
+    }
+  }, [terminals.length])
 
   const fetchTerminals = useCallback(async () => {
     if (!session?.user) return;
@@ -28,33 +61,18 @@ export function TerminalManager() {
             await updateTerminal(data[0]._id, { isActive: true });
         }
       } else {
-        addTerminal()
+        await addTerminal()
       }
     } catch (error) {
       toast.error('Failed to load terminals')
     }
-  }, [session]);
+  }, [session, addTerminal, updateTerminal]);
 
   useEffect(() => {
     fetchTerminals()
   }, [fetchTerminals])
 
-  const addTerminal = async () => {
-    try {
-      const response = await fetch('/api/terminal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: `Terminal ${terminals.length + 1}` })
-      })
-      const newTerminal = await response.json()
-      setTerminals([...terminals, newTerminal])
-      setActiveTerminalId(newTerminal._id)
-    } catch (error) {
-      toast.error('Failed to create terminal')
-    }
-  }
-
-  const removeTerminal = async (terminalId: string) => {
+  const removeTerminal = useCallback(async (terminalId: string) => {
     if (terminals.length <= 1) {
         toast.info("Cannot close the last terminal.");
         return;
@@ -76,25 +94,12 @@ export function TerminalManager() {
     } catch (error) {
       toast.error('Failed to delete terminal')
     }
-  }
+  }, [terminals, activeTerminalId, updateTerminal])
 
-  const updateTerminal = async (terminalId: string, updates: Partial<TerminalSessionType>) => {
-    if (!terminalId) return
-    try {
-      await fetch(`/api/terminal`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ terminalId, ...updates })
-      })
-    } catch (error) {
-      console.error('Failed to update terminal:', error)
-    }
-  }
-
-  const handleSelectTerminal = (terminalId: string) => {
+  const handleSelectTerminal = useCallback((terminalId: string) => {
     setActiveTerminalId(terminalId);
     updateTerminal(terminalId, {isActive: true});
-  }
+  }, [updateTerminal]);
 
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e] text-[#cccccc]">
