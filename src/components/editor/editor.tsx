@@ -1,7 +1,7 @@
 
 "use client";
 
-import Editor, { OnChange, type OnMount } from "@monaco-editor/react";
+import MonacoEditor, { OnChange, type OnMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
@@ -176,7 +176,7 @@ export function Editor({ initialFile }: { initialFile: FileType }) {
   return (
     <div className="h-full flex flex-col bg-background">
       <div className="flex-1">
-        <Editor
+        <MonacoEditor
           height="100%"
           path={file.name}
           defaultLanguage={getLanguageConfigFromFilename(file.name).monacoLanguage}
