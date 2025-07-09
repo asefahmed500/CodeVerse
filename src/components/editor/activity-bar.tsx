@@ -13,7 +13,7 @@ import { activityItems } from "@/config/views";
 import { UserButton } from "../auth/user-button";
 
 export function ActivityBar() {
-  const { activeView, setActiveView } = useActiveView();
+  const { activeView, toggleActiveView } = useActiveView();
 
   return (
     <TooltipProvider>
@@ -26,7 +26,7 @@ export function ActivityBar() {
                         variant="ghost"
                         size="icon"
                         className={`w-10 h-10 rounded-lg ${activeView === item.view ? "text-foreground bg-secondary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
-                        onClick={() => setActiveView(item.view)}
+                        onClick={() => toggleActiveView(item.view)}
                     >
                         <item.icon className="h-6 w-6" />
                     </Button>
@@ -44,7 +44,7 @@ export function ActivityBar() {
                     variant="ghost"
                     size="icon"
                     className={`w-10 h-10 rounded-lg ${activeView === "settings" ? "text-foreground bg-secondary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
-                    onClick={() => setActiveView("settings")}
+                    onClick={() => toggleActiveView("settings")}
                 >
                     <Settings className="h-6 w-6" />
                 </Button>
