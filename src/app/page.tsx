@@ -1,7 +1,4 @@
 
-"use client";
-
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { buttonVariants } from "@/components/ui/button";
@@ -98,11 +95,7 @@ const TestimonialCard = ({ name, title, avatar, dataAiHint, quote }: { name: str
 
 
 export default function Home() {
-  const [year, setYear] = useState(new Date().getFullYear());
-
-  useEffect(() => {
-    setYear(new Date().getFullYear());
-  }, []);
+  const year = new Date().getFullYear();
   
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
