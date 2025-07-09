@@ -49,7 +49,7 @@ function CreationInput({
     if (type === 'file') {
       const newFile = await createFile(name, parentId);
       if (newFile) {
-        router.push(`/editor/${newFile._id}`);
+        router.replace(`/editor/${newFile._id}`);
       }
     } else {
       await createFolder(name, parentId);
