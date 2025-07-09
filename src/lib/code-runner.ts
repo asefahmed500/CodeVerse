@@ -28,13 +28,13 @@ export const executeCode = async (
                 logs: [], 
                 errorLogs: [result.error || `Request failed with status ${response.status}`],
                 compileError: null,
-                executionError: null,
+                executionError: `Server responded with status ${response.status}`,
                 hasError: true
             };
         }
         
-        const logs = result.stdout ? result.stdout.split('\n').filter((l: string) => l.trim() !== '') : [];
-        const errorLogs = result.stderr ? result.stderr.split('\n').filter((l: string) => l.trim() !== '') : [];
+        const logs = result.stdout ? result.stdout.split('\n').filter((l: string) => l) : [];
+        const errorLogs = result.stderr ? result.stderr.split('\n').filter((l: string) => l) : [];
         const compileError = result.compile_output?.trim() || null;
         
         let executionError = null;
@@ -51,7 +51,7 @@ export const executeCode = async (
             logs: [], 
             errorLogs: [`An unexpected client-side error occurred: ${e.message}`],
             compileError: null,
-            executionError: null,
+            executionError: `Client-side error: ${e.message}`,
             hasError: true
         };
     }

@@ -17,7 +17,7 @@ export const LANGUAGE_CONFIG: Record<string, {
     extensions: [".ts", ".tsx"],
     monacoLanguage: "typescript",
     judge0Id: 94, // TypeScript (5.0.3)
-    runner: "node", // Assuming ts-node or similar is handled by executor
+    runner: "ts-node",
   },
   python: {
     name: "Python",
@@ -31,56 +31,56 @@ export const LANGUAGE_CONFIG: Record<string, {
     extensions: [".java"],
     monacoLanguage: "java",
     judge0Id: 62, // Java (OpenJDK 13.0.1)
-    runner: "run-java",
+    runner: "java",
   },
   c: {
     name: "C",
     extensions: [".c"],
     monacoLanguage: "c",
     judge0Id: 52, // C (GCC 9.2.0)
-    runner: "run-c",
+    runner: "c",
   },
   cpp: {
     name: "C++",
     extensions: [".cpp", ".cxx"],
     monacoLanguage: "cpp",
     judge0Id: 54, // C++ (GCC 9.2.0)
-    runner: "run-cpp",
+    runner: "cpp",
   },
   csharp: {
     name: "C#",
     extensions: [".cs"],
     monacoLanguage: "csharp",
     judge0Id: 51, // C# (Mono 6.6.0.161)
-    runner: "run-csharp",
+    runner: "csharp",
   },
   go: {
     name: "Go",
     extensions: [".go"],
     monacoLanguage: "go",
     judge0Id: 60, // Go (1.13.5)
-    runner: "run-go",
+    runner: "go",
   },
   php: {
     name: "PHP",
     extensions: [".php"],
     monacoLanguage: "php",
     judge0Id: 70, // PHP (7.4.1)
-    runner: "run-php",
+    runner: "php",
   },
   ruby: {
     name: "Ruby",
     extensions: [".rb"],
     monacoLanguage: "ruby",
     judge0Id: 72, // Ruby (2.7.0)
-    runner: "run-ruby",
+    runner: "ruby",
   },
   rust: {
     name: "Rust",
     extensions: [".rs"],
     monacoLanguage: "rust",
     judge0Id: 73, // Rust (1.40.0)
-    runner: "run-rust",
+    runner: "rust",
   },
   html: {
     name: "HTML",

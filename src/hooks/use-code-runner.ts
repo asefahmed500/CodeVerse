@@ -4,14 +4,15 @@ import { useActiveView } from '@/hooks/use-active-view';
 import { getLanguageConfigFromFilename } from '@/config/languages';
 import { toast } from 'sonner';
 import { executeCode } from '@/lib/code-runner';
+import { useTerminalManager } from './use-terminal-manager-store';
 
 export function useCodeRunner() {
-  const { activeFileId, findFile } = useFileSystem();
+  const { activeFile } = useFileSystem();
   const { appendOutput } = useTerminalStore();
   const { openView } = useActiveView();
+  const { setActiveTerminalId, terminals } = useTerminalManager();
 
   const runActiveFile = async () => {
-    const activeFile = findFile(activeFileId || '');
     if (!activeFile || activeFile.isFolder) {
         toast.error("No runnable file selected.");
         return;
@@ -37,7 +38,10 @@ export function useCodeRunner() {
         return;
     }
 
+    // Ensure terminal is visible and active
+    if(terminals.length > 0) setActiveTerminalId(terminals[0]._id);
     openView('terminal');
+    
     const toastId = toast.loading(`Executing ${activeFile.name}...`);
     
     const result = await executeCode(activeFile.content, languageConfig.judge0Id);
@@ -50,11 +54,13 @@ export function useCodeRunner() {
         outputLines.push(...result.compileError.split('\n').map(l => `\r\x1b[31m${l}\x1b[0m`));
     }
     
-    if(result.logs.length > 0) {
+    if (result.logs.length > 0) {
+        outputLines.push(`\r\n\x1b[1;32mOutput (stdout):\x1b[0m`);
         outputLines.push(...result.logs.map(l => `\r${l}`));
     }
     
-    if(result.errorLogs.length > 0) {
+    if (result.errorLogs.length > 0) {
+        outputLines.push(`\r\n\x1b[1;31mError Output (stderr):\x1b[0m`);
         outputLines.push(...result.errorLogs.map(l => `\r\x1b[31m${l}\x1b[0m`));
     }
 
