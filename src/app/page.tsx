@@ -1,10 +1,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowRight, Code, Terminal, GitBranch, Zap, Cloud, ShieldCheck, Star } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { ArrowRight, Code, Terminal, GitBranch, Zap, Cloud, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const features = [
