@@ -2,7 +2,6 @@
 
 import { useActiveView } from "@/hooks/use-active-view";
 import { useCommandPaletteStore } from "@/hooks/use-command-palette-store";
-import { usePanelStore } from "@/hooks/use-panel-store";
 import { useSidebarStore } from "@/hooks/use-sidebar-store";
 import { useEffect } from "react";
 
@@ -22,9 +21,8 @@ function toggleFullScreen() {
 
 export function KeyboardShortcuts() {
   const { toggle: toggleCommandPalette } = useCommandPaletteStore();
-  const { activeView, setActiveView, openView } = useActiveView();
+  const { openView, toggleActiveView } = useActiveView();
   const { toggle: toggleSidebar } = useSidebarStore();
-  const { toggle: togglePanel } = usePanelStore();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -48,7 +46,7 @@ export function KeyboardShortcuts() {
       // Toggle Debug View
       if (isCtrlCmd && e.shiftKey && e.key.toLowerCase() === "d") {
         e.preventDefault();
-        setActiveView('debug');
+        toggleActiveView('debug');
         return;
       }
       
@@ -69,7 +67,7 @@ export function KeyboardShortcuts() {
       // Toggle Terminal
       if (isCtrlCmd && e.key === "`") {
         e.preventDefault();
-        setActiveView(activeView === "terminal" ? null : "terminal");
+        toggleActiveView("terminal");
         return;
       }
 
@@ -87,12 +85,10 @@ export function KeyboardShortcuts() {
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, [
-    activeView,
-    setActiveView,
     openView,
     toggleCommandPalette,
     toggleSidebar,
-    togglePanel,
+    toggleActiveView,
   ]);
 
   return null;
