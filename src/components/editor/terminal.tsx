@@ -243,6 +243,7 @@ export function Terminal({
                 setCurrentLine(currentLine.slice(0, -1));
             }
         } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
             if (historyIndex < commandHistory.length - 1) {
                 const newIndex = historyIndex + 1;
                 setHistoryIndex(newIndex);
@@ -251,16 +252,17 @@ export function Terminal({
                 setCurrentLine(cmd);
             }
         } else if (e.key === 'ArrowDown') {
-             if (historyIndex > 0) {
+            e.preventDefault();
+            if (historyIndex > -1) {
                 const newIndex = historyIndex - 1;
                 setHistoryIndex(newIndex);
-                const cmd = commandHistory[newIndex];
+                const cmd = commandHistory[newIndex] || '';
                 xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
                 setCurrentLine(cmd);
             } else {
-                setHistoryIndex(-1);
-                xterm.current.write('\x1b[2K\r' + prompt(currentPath));
-                setCurrentLine('');
+                 setHistoryIndex(-1);
+                 xterm.current.write('\x1b[2K\r' + prompt(currentPath));
+                 setCurrentLine('');
             }
         }
         else if (!e.ctrlKey && !e.altKey && !e.metaKey) {

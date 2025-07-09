@@ -9,44 +9,29 @@ import { FileIcon } from './file-icon'
 import { Button } from '../ui/button'
 
 export function EditorTabs() {
-  const { files, closeFile, activeFileId, setActiveFileId } = useFileSystem()
+  const { files, allFiles, closeFile, activeFileId, setActiveFileId } = useFileSystem()
   const router = useRouter()
 
   const openFiles = useMemo(() => {
-    const collected: FileType[] = []
-    const findOpen = (fs: FileType[]) => {
-      fs.forEach(f => {
-        if (!f.isFolder && f.isOpen) {
-          collected.push(f)
-        }
-        if (f.isFolder && f.children) {
-          findOpen(f.children)
-        }
-      })
-    }
-    findOpen(files)
-    return collected.sort((a, b) => (a.updatedAt > b.updatedAt ? -1 : 1))
-  }, [files])
+    return allFiles
+      .filter(f => !f.isFolder && f.isOpen)
+      .sort((a, b) => (a.updatedAt > b.updatedAt ? -1 : 1))
+  }, [allFiles])
 
   const handleCloseTab = (e: React.MouseEvent, fileToClose: FileType) => {
     e.stopPropagation()
 
-    // Predict the next state before dispatching the update
     const remainingOpenFiles = openFiles.filter(f => f._id !== fileToClose._id);
+    closeFile(fileToClose._id);
 
-    // Dispatch the state update
-    closeFile(fileToClose._id)
-
-    // Act on the predicted state
     if (activeFileId === fileToClose._id) {
       if (remainingOpenFiles.length > 0) {
-        // The list is already sorted by most recently used
-        const newActiveFile = remainingOpenFiles[0]
+        const newActiveFile = remainingOpenFiles[0];
         setActiveFileId(newActiveFile._id)
-        router.push(`/editor/${newActiveFile._id}`)
+        router.push(`/editor/${newActiveFile._id}`);
       } else {
-        setActiveFileId(null)
-        router.push('/editor')
+        setActiveFileId(null);
+        router.push('/editor');
       }
     }
   }

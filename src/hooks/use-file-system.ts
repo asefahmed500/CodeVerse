@@ -154,6 +154,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
               state.files = buildFileTree(state.allFiles);
             }));
             
+            get().setActiveFileId(createdFile._id);
             toast.success(`File "${createdFile.name}" created.`);
             return createdFile;
         } catch(e: any) {
@@ -203,9 +204,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const file = state.allFiles.find(f => f._id === fileId);
         if (file) {
           file.content = content;
-        }
-        if (!state.dirtyFileIds.includes(fileId)) {
-          state.dirtyFileIds.push(fileId);
+          if (!state.dirtyFileIds.includes(fileId)) {
+            state.dirtyFileIds.push(fileId);
+          }
         }
       }));
     },
@@ -353,6 +354,21 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
     setActiveFileId: (fileId) => {
         set(produce((state: FileSystemState) => {
+            const fileMap = new Map(state.allFiles.map(f => [f._id, f]));
+            
+            const ancestors = new Set<string>();
+            let currentFile = fileId ? fileMap.get(fileId) : null;
+            if (currentFile?.parentId) {
+                let parentId = currentFile.parentId;
+                while(parentId) {
+                    ancestors.add(parentId);
+                    const parent = fileMap.get(parentId);
+                    parentId = parent?.parentId ?? null;
+                }
+            }
+
+            state.expandedFolders = [...new Set([...state.expandedFolders, ...ancestors])];
+
             state.allFiles.forEach(f => {
                 f.isActive = f._id === fileId;
                 if(f.isActive && !f.isFolder) {
@@ -365,17 +381,12 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
     },
     
     closeFile: (fileId: string) => {
-        set(produce((state: FileSystemState) => {
-            const file = state.allFiles.find(f => f._id === fileId);
-            if (file) {
-                file.isOpen = false;
-                if (file.isActive) {
-                    file.isActive = false;
-                    state.activeFileId = null;
-                }
-            }
-            state.files = buildFileTree(state.allFiles);
-        }));
+      set(produce((state: FileSystemState) => {
+          const fileToClose = state.allFiles.find(f => f._id === fileId);
+          if (fileToClose) {
+              fileToClose.isOpen = false;
+          }
+      }));
     },
 
     toggleFolder: (folderId) => {
