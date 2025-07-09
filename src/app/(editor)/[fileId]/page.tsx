@@ -24,32 +24,29 @@ export default function EditorFilePage() {
   const router = useRouter();
   const { findFile, setActiveFileId, loading: fileSystemLoading, allFiles } = useFileSystem();
 
+  // Find the file to render in the current state.
+  // It might be null initially if the state hasn't updated yet.
   const fileToRender = findFile(fileId);
 
   useEffect(() => {
-    // Rely on allFiles dependency to re-run this effect when the file list changes.
-    if (fileSystemLoading) return;
-
-    const file = findFile(fileId);
-    if (file) {
-      if (file.isFolder) {
-        // If a folder is selected, it's better to go to the editor's root view.
+    // This effect's job is to sync the active file ID in the global state.
+    // It should ONLY run when we are certain the file exists.
+    if (fileToRender) {
+      if (fileToRender.isFolder) {
+        // Folders shouldn't have their own editor pages.
+        // Redirect to the main editor view.
         router.replace('/editor');
         return;
       }
       setActiveFileId(fileId);
-    } else {
-      // If the file isn't found after loading, it might be a true 404
-      // or the state hasn't propagated yet. The loading guard below handles the latter.
-      // If it's still not found after loading, redirect.
-      if (!fileSystemLoading) {
-         router.replace('/editor');
-      }
     }
-  }, [fileId, fileSystemLoading, findFile, router, setActiveFileId, allFiles]);
+    // We also listen to `allFiles` changing. If the file we are looking for appears, this effect will re-run.
+  }, [fileId, fileToRender, router, setActiveFileId, allFiles]);
 
-  // This is the main loading guard. It waits for both the file system to be loaded
-  // AND for the specific file to be available in the state. This fixes the race condition.
+
+  // This is the new, robust loading guard.
+  // It waits for the initial file system load to complete AND for the specific file to be available.
+  // This solves the race condition where we navigate before the state has propagated.
   if (fileSystemLoading || !fileToRender) {
     return (
       <div className="flex items-center justify-center flex-1 h-full bg-background">
@@ -59,11 +56,12 @@ export default function EditorFilePage() {
     );
   }
   
-  // This check is a safeguard in case the useEffect hasn't redirected yet.
+  // This check is a final safeguard in case the useEffect redirect hasn't fired yet.
   if (fileToRender.isFolder) {
       return null;
   }
 
+  // Render the editor only when we are sure we have a valid file.
   return (
       <CodeEditor file={fileToRender as FileType} key={fileToRender._id} />
   );
