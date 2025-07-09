@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Github } from 'lucide-react'
+import { Github, Check } from 'lucide-react'
 import { useSession, signIn } from 'next-auth/react'
 import { useActiveView } from '@/hooks/use-active-view'
 import { useFileSystem } from '@/hooks/use-file-system'
@@ -72,13 +72,11 @@ function CloneView() {
 }
 
 function CommitView() {
-    const { allFiles } = useFileSystem();
+    const { allFiles, dirtyFileIds, commitChanges } = useFileSystem();
     const router = useRouter();
     const [commitMessage, setCommitMessage] = useState('');
 
-    // This is a simulation, so we'll just list all files as "changes"
-    // A real implementation would compare against a git state.
-    const changedFiles = allFiles; 
+    const changedFiles = allFiles.filter(f => dirtyFileIds.includes(f._id) && !f.isFolder);
 
     const handleFileClick = (file: FileType) => {
         if (!file.isFolder) {
@@ -91,10 +89,9 @@ function CommitView() {
             toast.error("Please enter a commit message.");
             return;
         }
-        // In a real app, this would trigger a git commit and push.
-        // Here, we just show a success message as per the requirements.
         toast.success("Changes committed (simulation).");
         setCommitMessage('');
+        commitChanges();
     }
 
     return (
@@ -104,25 +101,37 @@ function CommitView() {
                     placeholder="Commit message" 
                     value={commitMessage}
                     onChange={(e) => setCommitMessage(e.target.value)}
+                    disabled={changedFiles.length === 0}
                 />
-                <Button className="w-full mt-2" onClick={handleCommit} disabled={!commitMessage.trim()}>
-                    Commit (Simulation)
+                <Button 
+                    className="w-full mt-2" 
+                    onClick={handleCommit} 
+                    disabled={!commitMessage.trim() || changedFiles.length === 0}
+                >
+                    Commit ({changedFiles.length}) Changes
                 </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-2 border-t border-border">
-                <h4 className="font-medium text-sm mb-2">Changes ({changedFiles.length})</h4>
-                <ul>
-                    {changedFiles.map(file => (
-                        <li
-                            key={file._id}
-                            className="flex items-center gap-2 p-1 rounded-md hover:bg-accent cursor-pointer"
-                            onClick={() => handleFileClick(file)}
-                        >
-                            <FileIcon filename={file.name} isFolder={file.isFolder} className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-sm truncate">{file.name}</span>
-                        </li>
-                    ))}
-                </ul>
+                {changedFiles.length > 0 ? (
+                    <ul>
+                        {changedFiles.map(file => (
+                            <li
+                                key={file._id}
+                                className="flex items-center gap-2 p-1 rounded-md hover:bg-accent cursor-pointer"
+                                onClick={() => handleFileClick(file)}
+                            >
+                                <FileIcon filename={file.name} isFolder={file.isFolder} className="h-4 w-4 flex-shrink-0" />
+                                <span className="text-sm truncate">{file.name}</span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                        <Check className="h-8 w-8 mb-2 text-green-500" />
+                        <p className="text-sm font-medium">No changes</p>
+                        <p className="text-xs">Your workspace is clean.</p>
+                    </div>
+                )}
             </div>
         </div>
     )

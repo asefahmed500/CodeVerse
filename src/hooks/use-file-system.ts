@@ -45,6 +45,7 @@ interface FileSystemState {
   activeFileId: string | null;
   expandedFolders: string[];
   loading: boolean;
+  dirtyFileIds: string[];
   
   fetchFiles: () => Promise<void>;
   findFile: (fileId: string) => FileType | null;
@@ -59,7 +60,8 @@ interface FileSystemState {
   searchFiles: (query: string) => Promise<SearchResult[]>;
   replaceInFiles: (query: string, replaceWith: string) => Promise<void>;
   setWorkspaceFromGitHub: (owner: string, repo: string) => Promise<{ firstFileId: string | null } | void>;
-  reset: () => void; // This will now be a server-side action
+  commitChanges: () => void;
+  reset: () => void;
 }
 
 const useFileSystemStore = create<FileSystemState>((set, get) => ({
@@ -68,6 +70,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
     activeFileId: null,
     expandedFolders: [],
     loading: true,
+    dirtyFileIds: [],
 
     fetchFiles: async () => {
         set({ loading: true });
@@ -79,6 +82,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 files: tree,
                 allFiles: getFlatFiles(tree),
                 loading: false,
+                dirtyFileIds: [],
             });
         } catch (error: any) {
             toast.error(error.message);
@@ -137,7 +141,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 isActive: true
             };
             
-            // Deactivate previously active file
             const currentActive = state.allFiles.find(f => f._id === state.activeFileId);
             if (currentActive) {
                 currentActive.isActive = false;
@@ -153,7 +156,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         }));
 
         toast.success(`File "${createdFile.name}" created.`);
-        return get().findFile(createdFile._id); // Return the file with its client-side state
+        return get().findFile(createdFile._id);
     },
 
     createFolder: async (name: string, parentId: string | null = null) => {
@@ -189,6 +192,17 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
     },
 
     updateFile: async (fileId, updates, options = { optimistic: false }) => {
+        const originalFile = get().findFile(fileId);
+        const contentChanged = updates.content !== undefined && updates.content !== originalFile?.content;
+
+        if (contentChanged) {
+            set(produce((state: FileSystemState) => {
+                if (!state.dirtyFileIds.includes(fileId)) {
+                    state.dirtyFileIds.push(fileId);
+                }
+            }));
+        }
+
         if (options.optimistic && !options.noUpdate) {
             set(produce((state: FileSystemState) => {
                 const file = state.allFiles.find(f => f._id === fileId);
@@ -209,8 +223,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         
         if (!res.ok) {
             toast.error("Failed to save file.");
-            // Consider rolling back optimistic update here
-            get().fetchFiles(); // Re-fetch to be safe
+            get().fetchFiles();
             return;
         }
 
@@ -221,7 +234,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             state.files = buildFileTree(state.allFiles);
         }));
 
-        if(!options.optimistic) toast.success(`Saved ${updatedFile.name}.`);
+        if(!options.optimistic && !contentChanged) toast.success(`Saved ${updatedFile.name}.`);
     },
 
     deleteFile: async (fileId) => {
@@ -243,7 +256,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             return { nextActiveFileId: get().activeFileId };
         }
         
-        // Optimistically update the state before refetching
         set(produce((state: FileSystemState) => {
             const idsToDelete = new Set<string>([fileId]);
             if (fileToDelete.isFolder) {
@@ -259,6 +271,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             }
             state.allFiles = state.allFiles.filter(f => !idsToDelete.has(f._id));
             state.files = buildFileTree(state.allFiles);
+            state.dirtyFileIds = state.dirtyFileIds.filter(id => !idsToDelete.has(id));
         }));
 
         toast.success(`Deleted ${fileToDelete.name}.`);
@@ -282,7 +295,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
         const duplicatedFile = await res.json();
         
-        // Find a new name for the duplicated item
         const siblingNames = get().allFiles
             .filter(f => f.parentId === originalNode.parentId)
             .map(f => f.name);
@@ -298,9 +310,8 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             counter++;
         } while (siblingNames.includes(newName));
 
-        // Update the name of the newly created duplicate
         await get().updateFile(duplicatedFile._id, { name: newName });
-        await get().fetchFiles(); // Refetch to get the full duplicated structure
+        await get().fetchFiles();
 
         toast.success(`Duplicated "${originalNode.name}"`);
     },
@@ -318,8 +329,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 if (!newActive.isFolder) newActive.isOpen = true;
             }
             state.activeFileId = fileId;
-            // No need to rebuild tree if only active state changes
-            // state.files = buildFileTree(state.allFiles);
         }));
     },
 
@@ -389,7 +398,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const toastId = toast.loading(`Cloning ${owner}/${repo}...`);
         try {
             const res = await fetch(`/api/github?action=getRepoTree&owner=${owner}&repo=${repo}`);
-            const ghItems: { path: string; content?: string; isFolder: boolean }[] = await res.json();
+            const ghItems: { path: string; content?: string; type: 'file' | 'dir' }[] = await res.json();
 
             if (!res.ok) throw new Error((ghItems as any).error || "Failed to clone repository.");
             if (ghItems.length === 0) {
@@ -401,9 +410,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const itemsToCreate = ghItems.map(item => ({
                 path: item.path,
                 name: item.path.split('/').pop()!,
-                content: !item.isFolder ? item.content || '' : '',
-                isFolder: item.isFolder,
-                language: !item.isFolder ? getLanguageConfigFromFilename(item.path).monacoLanguage : 'plaintext',
+                content: item.type === 'file' ? item.content || '' : '',
+                isFolder: item.type === 'dir',
+                language: item.type === 'file' ? getLanguageConfigFromFilename(item.path).monacoLanguage : 'plaintext',
             }));
 
             const bulkRes = await fetch('/api/files?action=bulkCreate', {
@@ -419,6 +428,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const firstFile = get().allFiles.find(f => !f.isFolder);
             const firstFileId = firstFile?._id ?? null;
             get().setActiveFileId(firstFileId);
+            set({ dirtyFileIds: [] });
 
             toast.success(`Cloned ${repo} successfully.`, { id: toastId });
             return { firstFileId };
@@ -428,6 +438,10 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             set({ loading: false });
         }
     },
+    
+    commitChanges: () => {
+        set({ dirtyFileIds: [] });
+    },
       
     reset: async () => {
         const res = await fetch('/api/files?action=resetAll', { method: 'DELETE' });
@@ -435,7 +449,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             toast.error("Failed to reset workspace.");
             return;
         }
-        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [] });
+        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [], dirtyFileIds: [] });
         toast.success("Workspace has been reset.");
     }
 }));
