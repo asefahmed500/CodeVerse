@@ -1,5 +1,7 @@
+
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { buttonVariants } from "@/components/ui/button";
@@ -96,6 +98,12 @@ const TestimonialCard = ({ name, title, avatar, dataAiHint, quote }: { name: str
 
 
 export default function Home() {
+  const [year, setYear] = useState(new Date().getFullYear());
+
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+  
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-sm">
@@ -218,7 +226,7 @@ export default function Home() {
                 <span className="font-bold">CodeVerse</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} CodeVerse. All rights reserved.
+              &copy; {year} CodeVerse. All rights reserved.
             </p>
             <nav className="flex gap-4 sm:gap-6">
               <Link href="/terms" className="text-sm hover:underline underline-offset-4 text-muted-foreground">
