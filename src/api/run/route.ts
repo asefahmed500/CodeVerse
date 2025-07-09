@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import axios, { isAxiosError } from "axios";
 import { auth } from "@/lib/auth";
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -23,14 +25,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const options = {
+  const submissionOptions = {
     method: 'POST',
     url: 'https://judge0-ce.p.rapidapi.com/submissions',
-    params: {
-      base64_encoded: 'false',
-      wait: 'true', // Wait for the execution to complete
-      fields: '*'
-    },
     headers: {
       'content-type': 'application/json',
       'X-RapidAPI-Key': process.env.JUDGE0_API_KEY,
@@ -43,8 +40,52 @@ export async function POST(request: Request) {
   };
 
   try {
-    const response = await axios.request(options);
-    return NextResponse.json(response.data);
+    // Step 1: Create the submission to get a token
+    const submissionResponse = await axios.request(submissionOptions);
+    const { token } = submissionResponse.data;
+
+    if (!token) {
+        throw new Error("Failed to get submission token from Judge0.");
+    }
+    
+    // Step 2: Poll the submission status until it's completed
+    let resultResponse;
+    const MAX_POLLS = 10;
+    const POLL_INTERVAL_MS = 1000;
+
+    for (let i = 0; i < MAX_POLLS; i++) {
+        await sleep(POLL_INTERVAL_MS);
+        
+        const resultOptions = {
+            method: 'GET',
+            url: `https://judge0-ce.p.rapidapi.com/submissions/${token}`,
+            params: {
+                base64_encoded: 'false',
+                fields: '*'
+            },
+            headers: {
+                'X-RapidAPI-Key': process.env.JUDGE0_API_KEY!,
+                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+            }
+        };
+        resultResponse = await axios.request(resultOptions);
+        const statusId = resultResponse.data.status?.id;
+
+        // Status IDs 1 (In Queue) and 2 (Processing) mean we keep polling.
+        // If status is anything else (3+, e.g., Accepted, Error), we stop.
+        if (statusId > 2) {
+            break; 
+        }
+    }
+    
+    // Check if the loop finished without a result or timed out
+    if (!resultResponse || resultResponse.data.status?.id <= 2) {
+      throw new Error("Code execution timed out or failed to complete.");
+    }
+
+    // Return the final result
+    return NextResponse.json(resultResponse.data);
+
   } catch (error: any) {
     console.error("Judge0 API Error:", error);
     let message = "An unexpected error occurred during code execution.";
@@ -52,8 +93,6 @@ export async function POST(request: Request) {
 
     if (isAxiosError(error)) {
         if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
             status = error.response.status;
             const responseData = error.response.data;
             if (responseData && typeof responseData === 'object') {
@@ -63,11 +102,9 @@ export async function POST(request: Request) {
             }
             console.error("Judge0 Response Error Data:", error.response.data);
         } else if (error.request) {
-            // The request was made but no response was received
             message = "No response received from Judge0 service. It might be down or blocked.";
             console.error("Judge0 No Response Error:", error.request);
         } else {
-            // Something happened in setting up the request that triggered an Error
             message = `Error setting up Judge0 request: ${error.message}`;
             console.error("Axios Setup Error:", error.message);
         }
