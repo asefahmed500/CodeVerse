@@ -2,7 +2,7 @@
 "use client";
 
 import MonacoEditor, { OnChange, type OnMount } from "@monaco-editor/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -12,7 +12,6 @@ import { useFileSystem } from "@/hooks/use-file-system";
 import { debounce } from "@/lib/utils";
 import { useEditorStore } from "@/hooks/use-editor-store";
 import { useEditorSettingsStore } from "@/hooks/use-editor-settings-store";
-import { initVimMode } from 'monaco-vim';
 import { getSnippets } from "@/config/snippets";
 import { useDebugStore } from "@/hooks/use-debug-store";
 import type * as monaco from 'monaco-editor';
@@ -110,12 +109,16 @@ export function Editor({ initialFile }: { initialFile: FileType }) {
 }, [isDebugging, isPaused, currentLine, debugFile, file._id, editor]);
 
   useEffect(() => {
-    if (editorRef.current && vimMode) {
-      vimModeRef.current = initVimMode(editorRef.current, document.createElement('div'));
-    } else if (vimModeRef.current) {
-      vimModeRef.current.dispose();
-      vimModeRef.current = null;
+    const initVim = async () => {
+        if (editorRef.current && vimMode) {
+            const { initVimMode } = await import('monaco-vim');
+            vimModeRef.current = initVimMode(editorRef.current, document.createElement('div'));
+        } else if (vimModeRef.current) {
+            vimModeRef.current.dispose();
+            vimModeRef.current = null;
+        }
     }
+    initVim();
     return () => {
       vimModeRef.current?.dispose();
     };
