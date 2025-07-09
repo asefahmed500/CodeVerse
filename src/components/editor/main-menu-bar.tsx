@@ -13,17 +13,15 @@ import { useFileSystem } from "@/hooks/use-file-system";
 import { useEditorStore } from "@/hooks/use-editor-store";
 import { useCommandPaletteStore } from "@/hooks/use-command-palette-store";
 import { useActiveView } from "@/hooks/use-active-view";
-import { useTerminalStore } from "@/hooks/use-terminal-store";
-import { getLanguageConfigFromFilename } from "@/config/languages";
-import { toast } from "sonner";
+import { useCodeRunner } from "@/hooks/use-code-runner";
 import { useRouter } from "next/navigation";
 
 export function MainMenuBar() {
-  const { createFile, createFolder, activeFileId, findFile, getPathForFile } = useFileSystem();
+  const { createFile, createFolder, activeFileId, findFile } = useFileSystem();
   const { editor, triggerSave, triggerCommand } = useEditorStore();
   const { setOpen: setCommandPaletteOpen } = useCommandPaletteStore();
   const { setActiveView, openView } = useActiveView();
-  const { runCommand } = useTerminalStore();
+  const { runActiveFile } = useCodeRunner();
   const router = useRouter();
 
   const activeFile = findFile(activeFileId || '');
@@ -34,34 +32,6 @@ export function MainMenuBar() {
         router.push(`/editor/${newFile._id}`);
     }
   }
-
-  const handleRun = () => {
-    if (!activeFile || activeFile.isFolder) return;
-    const languageConfig = getLanguageConfigFromFilename(activeFile.name);
-
-    if (languageConfig.monacoLanguage === 'html') {
-        const blob = new Blob([activeFile.content], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        // It's better to let the browser manage the blob URL lifecycle
-        // URL.revokeObjectURL(url); 
-        return;
-    }
-
-    if (!languageConfig?.judge0Id) {
-      toast.error(`'${languageConfig.name}' files cannot be run.`);
-      return;
-    }
-    
-    const path = getPathForFile(activeFile._id);
-    if (path) {
-        const command = languageConfig.runner || 'node';
-        openView('terminal');
-        runCommand(`${command} ${path}`);
-    } else {
-        toast.error("Could not determine file path to run.");
-    }
-  };
 
   const isRunnable = activeFile && !activeFile.isFolder;
 
@@ -131,7 +101,7 @@ export function MainMenuBar() {
       <MenubarMenu>
         <MenubarTrigger className="h-full px-2">Run</MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onSelect={handleRun} disabled={!isRunnable}>
+          <MenubarItem onSelect={runActiveFile} disabled={!isRunnable}>
             Run File
           </MenubarItem>
         </MenubarContent>

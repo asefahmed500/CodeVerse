@@ -2,19 +2,15 @@
 
 import { Play, Menu } from 'lucide-react';
 import { useFileSystem } from '@/hooks/use-file-system';
-import { useTerminalStore } from '@/hooks/use-terminal-store';
-import { useActiveView } from '@/hooks/use-active-view';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { getLanguageConfigFromFilename } from '@/config/languages';
 import { useMobileSidebar } from '@/hooks/use-mobile-sidebar';
 import { MainMenuBar } from './main-menu-bar';
+import { useCodeRunner } from '@/hooks/use-code-runner';
 
 export function TitleBar() {
-  const { activeFileId, findFile, getPathForFile } = useFileSystem();
-  const { runCommand } = useTerminalStore();
-  const { openView } = useActiveView();
+  const { activeFileId, findFile } = useFileSystem();
   const { toggle: toggleMobileSidebar } = useMobileSidebar();
+  const { runActiveFile } = useCodeRunner();
   
   const activeFile = findFile(activeFileId || '');
 
@@ -22,33 +18,7 @@ export function TitleBar() {
     ? `${activeFile.name} - CodeVerse`
     : 'CodeVerse';
   
-  const languageConfig = activeFile ? getLanguageConfigFromFilename(activeFile.name) : null;
   const isRunnable = activeFile && !activeFile.isFolder;
-
-  const handleRun = () => {
-    if (!activeFile || !languageConfig) return;
-
-    if (languageConfig.monacoLanguage === 'html') {
-        const blob = new Blob([activeFile.content], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        return;
-    }
-      
-    if (!languageConfig.judge0Id) {
-        toast.error(`'${languageConfig.name}' files cannot be run.`);
-        return;
-    }
-
-    const path = getPathForFile(activeFile._id);
-    if (path) {
-        openView('terminal');
-        const command = languageConfig.runner || 'node';
-        runCommand(`${command} ${path}`);
-    } else {
-        toast.error("Could not determine file path to run.");
-    }
-  }
 
   return (
     <>
@@ -70,7 +40,7 @@ export function TitleBar() {
       </div>
       <div className="flex items-center no-drag-region pr-2">
         {isRunnable && (
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-foreground mr-2" onClick={handleRun} title="Run Code">
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-foreground mr-2" onClick={runActiveFile} title="Run Code">
                 <Play size={16} />
             </Button>
         )}
