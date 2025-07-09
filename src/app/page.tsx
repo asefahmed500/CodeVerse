@@ -54,7 +54,7 @@ export default function Home() {
                   </Link>
                 </div>
               </div>
-              <div className="flex items-center justify-center min-h-[400px]">
+              <div className="w-full h-[400px] lg:h-[500px] flex items-center justify-center -mt-10 lg:-mt-20">
                 <HeroAnimation />
               </div>
             </div>

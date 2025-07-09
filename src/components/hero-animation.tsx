@@ -35,49 +35,47 @@ function CodeScreen() {
 
 export function HeroAnimation() {
     return (
-        <div className="relative w-full h-[400px] lg:h-[500px] -mt-10 lg:-mt-20">
-             <Canvas
-                flat
-                camera={{ position: [0, 0, 5], fov: 50, near: 0.1, far: 2000 }}
-                dpr={[1, 2]}
-            >
-                <Suspense fallback={null}>
-                    <Environment preset="city" />
-                    <PresentationControls
-                        global
-                        rotation={[0.1, -0.2, 0]}
-                        polar={[-0.3, 0.3]}
-                        azimuth={[-0.5, 0.5]}
-                        config={{ mass: 2, tension: 400 }}
-                        snap={{ mass: 4, tension: 400 }}
-                    >
-                        <Float rotationIntensity={0.3} floatIntensity={1}>
-                            <rectAreaLight
-                                width={3}
-                                height={3}
-                                intensity={5}
-                                color={'#00FFFF'}
-                                rotation={[0.1, Math.PI, 0]}
-                                position={[0, 0.5, -1]}
-                            />
-                            <mesh>
-                                {/* This plane is just a container for the HTML, it's invisible */}
-                                <planeGeometry args={[4.5, 3]} />
-                                <meshStandardMaterial color="#fff" transparent opacity={0} />
-                                <Html
-                                    transform
-                                    wrapperClass="hero-screen"
-                                    distanceFactor={1}
-                                    position={[0, 0, 0.1]}
-                                    occlude
-                                >
-                                    <CodeScreen />
-                                </Html>
-                            </mesh>
-                        </Float>
-                    </PresentationControls>
-                </Suspense>
-            </Canvas>
-        </div>
+        <Canvas
+            flat
+            camera={{ position: [0, 0, 5], fov: 50, near: 0.1, far: 2000 }}
+            dpr={[1, 2]}
+        >
+            <Suspense fallback={null}>
+                <Environment preset="city" />
+                <PresentationControls
+                    global
+                    rotation={[0.1, -0.2, 0]}
+                    polar={[-0.3, 0.3]}
+                    azimuth={[-0.5, 0.5]}
+                    config={{ mass: 2, tension: 400 }}
+                    snap={{ mass: 4, tension: 400 }}
+                >
+                    <Float rotationIntensity={0.3} floatIntensity={1}>
+                        <rectAreaLight
+                            width={3}
+                            height={3}
+                            intensity={5}
+                            color={'#00FFFF'}
+                            rotation={[0.1, Math.PI, 0]}
+                            position={[0, 0.5, -1]}
+                        />
+                        <mesh>
+                            {/* This plane is just a container for the HTML, it's invisible */}
+                            <planeGeometry args={[4.5, 3]} />
+                            <meshStandardMaterial color="#fff" transparent opacity={0} />
+                            <Html
+                                transform
+                                wrapperClass="hero-screen"
+                                distanceFactor={1}
+                                position={[0, 0, 0.1]}
+                                occlude
+                            >
+                                <CodeScreen />
+                            </Html>
+                        </mesh>
+                    </Float>
+                </PresentationControls>
+            </Suspense>
+        </Canvas>
     );
 }
