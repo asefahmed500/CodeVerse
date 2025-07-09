@@ -14,10 +14,6 @@ import {
 import { activityItems, type View } from "@/config/views";
 import { UserButton } from "../auth/user-button";
 
-// This memoized component is the core of the fix. By isolating the button
-// and its tooltip, and by using `useCallback` for its click handler,
-// we prevent the parent's re-render from triggering a ref composition loop,
-// which was the cause of the "Maximum update depth" error.
 const ActivityBarItem = React.memo(function ActivityBarItem({
   item,
   activeView,
@@ -27,9 +23,6 @@ const ActivityBarItem = React.memo(function ActivityBarItem({
   activeView: ActiveView
   onToggle: (view: ActiveView) => void
 }) {
-  // By wrapping the handler in useCallback, we ensure the Button
-  // receives the exact same function instance across re-renders,
-  // preventing the memoization from being broken.
   const handleToggle = React.useCallback(() => {
     onToggle(item.view)
   }, [onToggle, item.view])

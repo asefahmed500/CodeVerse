@@ -3,6 +3,7 @@
 import { ThemeProvider } from 'next-themes';
 import { SessionProvider } from 'next-auth/react';
 import { type ThemeProviderProps } from 'next-themes/dist/types';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const themeProps: ThemeProviderProps = {
@@ -13,7 +14,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionProvider>
-      <ThemeProvider {...themeProps}>{children}</ThemeProvider>
+      <ThemeProvider {...themeProps}>
+        {children}
+        <SonnerToaster />
+      </ThemeProvider>
     </SessionProvider>
   );
 }
