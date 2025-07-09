@@ -61,13 +61,31 @@ export async function GET(request: Request) {
     try {
         await dbConnect();
         const files = await File.find({ userId }).sort({ isFolder: -1, name: 1 }).lean();
-        const tree = buildTree(files);
+        const tree = buildFileTree(files);
         return NextResponse.json(tree);
     } catch (error) {
         console.error("GET /api/files Error:", error);
         return NextResponse.json({ error: "Failed to fetch files" }, { status: 500 });
     }
 }
+
+const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string): Promise<mongoose.Types.ObjectId[]> => {
+    const descendants: mongoose.Types.ObjectId[] = [];
+    const queue: mongoose.Types.ObjectId[] = [fileId];
+    
+    while(queue.length > 0) {
+        const currentId = queue.shift()!;
+        const children = await File.find({ parentId: currentId, userId });
+        for (const child of children) {
+            descendants.push(child._id);
+            if (child.isFolder) {
+                queue.push(child._id);
+            }
+        }
+    }
+    return descendants;
+};
+
 
 // POST to create a file/folder or perform bulk actions
 export async function POST(request: Request) {
@@ -85,6 +103,10 @@ export async function POST(request: Request) {
         // Handle duplicating a file or folder
         if (action === 'duplicate') {
             const { sourceId } = await request.json();
+            if (!mongoose.Types.ObjectId.isValid(sourceId)) {
+                return NextResponse.json({ error: "Invalid source ID" }, { status: 400 });
+            }
+
             const original = await File.findById(sourceId).lean();
             if (!original || original.userId.toString() !== userId) {
                 return NextResponse.json({ error: "Original item not found or permission denied" }, { status: 404 });
@@ -103,17 +125,21 @@ export async function POST(request: Request) {
                     
                     let counter = 1;
                     let candidateName = `${baseName} copy${extension}`;
-                    while (siblingNames.includes(candidateName)) {
-                        counter++;
-                        candidateName = `${baseName} copy ${counter}${extension}`;
+                    if(siblingNames.includes(candidateName)) {
+                        while (siblingNames.includes(candidateName)) {
+                            counter++;
+                            candidateName = `${baseName} copy ${counter}${extension}`;
+                        }
                     }
                     newName = candidateName;
                 } else {
                      let counter = 1;
                     let candidateName = `${newName} copy`;
-                    while (siblingNames.includes(candidateName)) {
-                        counter++;
-                        candidateName = `${newName} copy ${counter}`;
+                    if(siblingNames.includes(candidateName)) {
+                        while (siblingNames.includes(candidateName)) {
+                            counter++;
+                            candidateName = `${newName} copy ${counter}`;
+                        }
                     }
                     newName = candidateName;
                 }
@@ -141,7 +167,12 @@ export async function POST(request: Request) {
                         newNode.children.push(newChild);
                     }
                 }
-                return newNode;
+                 // Serialize the result correctly
+                return {
+                    ...newNode,
+                    _id: newNode._id.toString(),
+                    parentId: newNode.parentId ? newNode.parentId.toString() : null,
+                };
             };
             
             const duplicated = await duplicateRecursively(original, original.parentId ? original.parentId.toString() : null);
@@ -272,21 +303,12 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
         
-        const idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
+        let idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         
         // If it's a folder, recursively find all descendant IDs
         if (fileToDelete.isFolder) {
-            const queue: mongoose.Types.ObjectId[] = [fileToDelete._id];
-            while (queue.length > 0) {
-                const parentId = queue.shift();
-                const children = await File.find({ userId, parentId });
-                for (const child of children) {
-                    idsToDelete.push(child._id);
-                    if (child.isFolder) {
-                        queue.push(child._id);
-                    }
-                }
-            }
+            const descendantIds = await findDescendants(fileToDelete._id, userId);
+            idsToDelete = idsToDelete.concat(descendantIds);
         }
 
         const uniqueIds = [...new Set(idsToDelete.map(id => id.toString()))];

@@ -29,10 +29,9 @@ function CreationInput({
   type: 'file' | 'folder';
   parentId: string | null;
   depth: number;
-  onComplete: () => void;
+  onComplete: (name: string) => void;
 }) {
   const [name, setName] = useState('');
-  const router = useRouter();
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -40,13 +39,7 @@ function CreationInput({
   }, []);
 
   const handleCreate = () => {
-    if (!name.trim()) {
-      onComplete();
-      return;
-    }
-    const parentIdParam = parentId ? `&parentId=${parentId}` : '';
-    router.push(`/editor/create?type=${type}&name=${encodeURIComponent(name)}${parentIdParam}`);
-    onComplete();
+    onComplete(name.trim());
   };
 
   return (
@@ -72,7 +65,7 @@ function CreationInput({
           onBlur={handleCreate}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleCreate();
-            if (e.key === 'Escape') onComplete();
+            if (e.key === 'Escape') onComplete(''); // Empty name cancels
           }}
           onClick={(e) => e.stopPropagation()}
           className="h-6 text-sm bg-background border-primary"
@@ -85,7 +78,8 @@ function CreationInput({
 export function Explorer() {
   const { activeView } = useActiveView();
   const [creating, setCreating] = useState<{ type: 'file' | 'folder'; parentId: string | null } | null>(null);
-  const { toggleFolder, expandedFolders } = useFileSystem();
+  const { toggleFolder, expandedFolders, createFile, createFolder } = useFileSystem();
+  const router = useRouter();
 
   if (activeView !== "explorer") {
     return null;
@@ -98,9 +92,21 @@ export function Explorer() {
     setCreating({ type, parentId });
   };
 
-  const handleCreationComplete = () => {
+  const handleCreationComplete = async (name: string, type: 'file' | 'folder', parentId: string | null) => {
     setCreating(null);
+    if (!name) return;
+
+    if (type === 'file') {
+      const newFile = await createFile(name, parentId);
+      if (newFile) {
+        router.push(`/editor/${newFile._id}`);
+      }
+    } else if (type === 'folder') {
+      await createFolder(name, parentId);
+      // No redirect for folders, explorer will update
+    }
   };
+
 
   return (
     <div className="h-full flex flex-col bg-card text-card-foreground select-none">
@@ -124,10 +130,14 @@ export function Explorer() {
   );
 }
 
-function FileTree({ creating, onStartCreation, onCreationComplete }: {
+function FileTree({ 
+    creating, 
+    onStartCreation, 
+    onCreationComplete 
+}: {
   creating: { type: 'file' | 'folder'; parentId: string | null } | null;
   onStartCreation: (type: 'file' | 'folder', parentId: string | null) => void;
-  onCreationComplete: () => void;
+  onCreationComplete: (name: string, type: 'file' | 'folder', parentId: string | null) => void;
 }) {
   const { files, loading, expandedFolders } = useFileSystem();
 
@@ -146,7 +156,7 @@ function FileTree({ creating, onStartCreation, onCreationComplete }: {
               type={creating.type}
               parentId={file._id}
               depth={depth + 1}
-              onComplete={onCreationComplete}
+              onComplete={(name) => onCreationComplete(name, creating.type, file._id)}
             />
           )}
         </>
@@ -168,7 +178,7 @@ function FileTree({ creating, onStartCreation, onCreationComplete }: {
                 type={creating.type}
                 parentId={null}
                 depth={0}
-                onComplete={onCreationComplete}
+                onComplete={(name) => onCreationComplete(name, creating.type, null)}
               />
             )}
         </CollapsibleContent>

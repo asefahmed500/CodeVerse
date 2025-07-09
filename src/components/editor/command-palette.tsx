@@ -15,7 +15,7 @@ import { useCommandPaletteStore } from '@/hooks/use-command-palette-store'
 export function CommandPalette() {
   const { isOpen: open, setOpen } = useCommandPaletteStore();
   const router = useRouter()
-  const { allFiles, createFolder } = useFileSystem()
+  const { allFiles, createFile, createFolder } = useFileSystem()
   const { setActiveView, openView } = useActiveView()
   const { setTheme } = useTheme()
 
@@ -43,8 +43,11 @@ export function CommandPalette() {
 
               <CommandPrimitive.Group heading="General" className="text-muted-foreground pt-2">
                 <CommandPrimitive.Item 
-                  onSelect={() => runCommand(() => {
-                    router.push('/editor/create?type=file&name=Untitled.js');
+                  onSelect={() => runCommand(async () => {
+                    const newFile = await createFile('Untitled.js');
+                    if (newFile) {
+                        router.push(`/editor/${newFile._id}`);
+                    }
                   })}
                   className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground"
                 >
@@ -53,7 +56,7 @@ export function CommandPalette() {
                 </CommandPrimitive.Item>
                 <CommandPrimitive.Item 
                   onSelect={() => runCommand(() => {
-                    router.push('/editor/create?type=folder&name=New%20Folder');
+                    createFolder('New Folder');
                   })}
                   className="flex items-center p-2 rounded cursor-pointer hover:bg-accent hover:text-accent-foreground text-foreground"
                 >

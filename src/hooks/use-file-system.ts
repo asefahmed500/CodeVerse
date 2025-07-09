@@ -43,18 +43,6 @@ const buildFileTree = (files: FileType[]): FileType[] => {
     return roots;
 };
 
-const getFlatFiles = (files: FileType[]): FileType[] => {
-    const allFiles: FileType[] = [];
-    const recursion = (fs: FileType[]) => {
-        fs.forEach(item => {
-            allFiles.push(item);
-            if(item.isFolder && item.children) recursion(item.children);
-        })
-    }
-    recursion(files);
-    return allFiles;
-}
-
 interface FileSystemState {
   files: FileType[]; // The tree structure
   allFiles: FileType[]; // A flat list for easy lookups
@@ -158,7 +146,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
               state.files = buildFileTree(state.allFiles);
             }));
             
-            get().setActiveFileId(createdFile._id);
             toast.success(`File "${createdFile.name}" created.`);
             return createdFile;
         } catch(e: any) {
@@ -311,27 +298,19 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             
             // The API now returns the full duplicated structure
             const duplicatedItem: FileType = await res.json();
-            const itemsToAdd: FileType[] = [duplicatedItem];
             
             // Helper to flatten the nested children from the API response
             const flattenChildren = (node: FileType): FileType[] => {
-                let flat: FileType[] = [];
+                let flat: FileType[] = [{...node, children: undefined}]; // Add the folder itself
                 if (node.children) {
                     node.children.forEach(child => {
-                        const childCopy = { ...child };
-                        delete childCopy.children; // Don't include children in the flat list item
-                        flat.push(childCopy);
-                        if (child.isFolder) {
-                            flat = flat.concat(flattenChildren(child));
-                        }
+                        flat.push(...flattenChildren(child));
                     });
                 }
                 return flat;
             };
 
-            if (duplicatedItem.isFolder) {
-                itemsToAdd.push(...flattenChildren(duplicatedItem));
-            }
+            const itemsToAdd = flattenChildren(duplicatedItem);
             
             set(produce((state: FileSystemState) => {
                 state.allFiles.push(...itemsToAdd);
