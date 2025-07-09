@@ -32,6 +32,7 @@ export default function EditorFilePage() {
     const file = findFile(fileId);
     if (file) {
       if (file.isFolder) {
+        // If a folder is selected, it's better to go to the editor's root view.
         router.replace('/editor');
         return;
       }
@@ -43,6 +44,8 @@ export default function EditorFilePage() {
     }
   }, [fileId, fileSystemLoading, findFile, router, setActiveFileId]);
 
+  // This is the main loading guard. It waits for both the file system to be loaded
+  // AND for the specific file to be available in the state.
   if (fileSystemLoading || !fileToRender) {
     return (
       <div className="flex items-center justify-center flex-1 h-full bg-background">
@@ -51,6 +54,7 @@ export default function EditorFilePage() {
     );
   }
   
+  // This check is a safeguard in case the useEffect hasn't redirected yet.
   if (fileToRender.isFolder) {
       return null;
   }

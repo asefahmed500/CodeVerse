@@ -11,11 +11,6 @@ export const authOptions: NextAuthConfig = {
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: 'repo,user', // Keep scope for cloning
-        },
-      },
     }),
     CredentialsProvider({
       name: 'Credentials',
@@ -46,7 +41,7 @@ export const authOptions: NextAuthConfig = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       await dbConnect();
       if (account?.provider === 'github') {
         try {
@@ -56,7 +51,13 @@ export const authOptions: NextAuthConfig = {
               email: user.email,
               name: user.name,
               image: user.image,
+              // No need to save password for OAuth users
             }).save();
+          } else {
+             // If user exists, maybe update their image or name from GitHub
+             if (user.name && user.name !== existingUser.name) existingUser.name = user.name;
+             if (user.image && user.image !== existingUser.image) existingUser.image = user.image;
+             await existingUser.save();
           }
           return true;
         } catch (err) {
@@ -64,13 +65,15 @@ export const authOptions: NextAuthConfig = {
           return false;
         }
       }
-      return true;
+      return true; // For credentials sign-in
     },
     async jwt({ token, user, account }) {
+      // Persist the OAuth access_token and user id to the token
       if (account) {
-        token.accessToken = account.access_token; // Keep for GitHub API calls
+        token.accessToken = account.access_token;
       }
-      if (user) {
+       if (user) {
+        // Find user in DB to get the mongo _id
         const dbUser = await User.findOne({ email: user.email });
         if (dbUser) {
           token.id = dbUser._id.toString();
@@ -79,9 +82,10 @@ export const authOptions: NextAuthConfig = {
       return token;
     },
     async session({ session, token }) {
+      // Send properties to the client, like an access_token and user id from a provider.
       if (session.user) {
         (session.user as any).id = token.id;
-        (session.user as any).accessToken = token.accessToken; // Keep for GitHub API calls
+        (session.user as any).accessToken = token.accessToken;
       }
       return session;
     },
