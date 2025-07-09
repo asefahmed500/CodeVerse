@@ -46,12 +46,13 @@ export default function Home() {
               <div className="relative group animate-in fade-in zoom-in-90 duration-500 delay-300">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-cyan-400 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
                 <Image
-                  src="https://placehold.co/600x400.png"
+                  src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=2070&auto=format&fit=crop"
                   data-ai-hint="code editor"
                   width="600"
                   height="400"
                   alt="Screenshot of the CodeVerse editor interface"
                   className="relative mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full shadow-2xl"
+                  priority
                 />
               </div>
             </div>
