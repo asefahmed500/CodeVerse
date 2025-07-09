@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from 'zustand';
@@ -426,10 +427,17 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
             if (!bulkRes.ok) throw new Error('Failed to save repository to workspace.');
             
-            const createdFiles = await bulkRes.json();
+            const createdFiles: FileType[] = await bulkRes.json();
             
             const tree = buildFileTree(createdFiles);
-            set({ files: tree, allFiles: createdFiles, dirtyFileIds: [] });
+            const newFolderIds = createdFiles.filter(f => f.isFolder).map(f => f._id);
+            
+            set({ 
+                files: tree, 
+                allFiles: createdFiles, 
+                dirtyFileIds: [], 
+                expandedFolders: newFolderIds 
+            });
             
             const firstFile = createdFiles.find((f: FileType) => !f.isFolder);
             const firstFileId = firstFile?._id ?? null;
