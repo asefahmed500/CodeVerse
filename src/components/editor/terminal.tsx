@@ -71,7 +71,7 @@ export function Terminal({
   const xterm = useRef<XTerminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const { theme } = useTheme();
-  const { commandToRun, commandProcessed } = useTerminalStore();
+  const { commandToRun, commandProcessed, outputToAppend, outputAppended } = useTerminalStore();
   const { allFiles } = useFileSystem();
 
   const [currentPath, setCurrentPath] = useState('/');
@@ -303,6 +303,7 @@ export function Terminal({
     }
   }, [theme]);
   
+  // This hook handles commands sent from the interactive shell simulation
   useEffect(() => {
     if (commandToRun && xterm.current) {
       xterm.current.write(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun}\x1b[0m`);
@@ -311,6 +312,15 @@ export function Terminal({
     }
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
   
+  // This hook handles direct output injection from the code runner
+  useEffect(() => {
+    if (outputToAppend && xterm.current) {
+        xterm.current.write(outputToAppend.content);
+        xterm.current.write(prompt(currentPath));
+        outputAppended();
+    }
+  }, [outputToAppend, outputAppended, currentPath]);
+
     useEffect(() => {
         if (xterm.current) {
             xterm.current.write('\x1b[2K\r' + prompt(currentPath) + currentLine);
