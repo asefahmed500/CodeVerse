@@ -5,59 +5,23 @@ import File from "@/models/file";
 import type { FileType } from "@/types";
 import mongoose from "mongoose";
 
-// Helper function to build a tree from a flat list of files
-const buildFileTree = (files: any[]): FileType[] => {
-    const fileMap = new Map<string, FileType & { children: FileType[] }>();
-    const tree: (FileType & { children: FileType[] })[] = [];
-
-    // First pass: create a map of nodes and initialize children arrays.
-    files.forEach(file => {
-        const doc = file._doc ? file._doc : file;
-        const node: FileType & { children: FileType[] } = {
-            _id: doc._id.toString(),
-            name: doc.name,
-            content: doc.content,
-            isFolder: doc.isFolder,
-            parentId: doc.parentId ? doc.parentId.toString() : null,
-            language: doc.language,
-            createdAt: doc.createdAt,
-            updatedAt: doc.updatedAt,
-            // These are client-side, but let's initialize them
-            isOpen: false,
-            isActive: false,
-            children: [],
-        };
-        fileMap.set(node._id, node);
-    });
-
-    // Second pass: link children to their parents.
-    fileMap.forEach(node => {
-        if (node.parentId && fileMap.has(node.parentId)) {
-            // The `!` is safe here because we check with .has()
-            fileMap.get(node.parentId)!.children.push(node);
-        } else {
-            tree.push(node);
+const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string): Promise<mongoose.Types.ObjectId[]> => {
+    const descendants: mongoose.Types.ObjectId[] = [];
+    const queue: mongoose.Types.ObjectId[] = [fileId];
+    
+    while(queue.length > 0) {
+        const currentId = queue.shift()!;
+        const children = await File.find({ parentId: currentId, userId });
+        for (const child of children) {
+            descendants.push(child._id);
+            if (child.isFolder) {
+                queue.push(child._id);
+            }
         }
-    });
+    }
+    return descendants;
+};
 
-    // Sort all children recursively
-    const sortChildren = (nodes: (FileType & { children: FileType[] })[]) => {
-      nodes.sort((a, b) => {
-        if (a.isFolder && !b.isFolder) return -1;
-        if (!a.isFolder && b.isFolder) return 1;
-        return a.name.localeCompare(b.name);
-      });
-      nodes.forEach(node => {
-        if (node.children && node.children.length > 0) {
-          sortChildren(node.children);
-        }
-      });
-    };
-
-    sortChildren(tree);
-
-    return tree;
-}
 
 // GET all files for a user
 export async function GET(request: Request) {
@@ -69,9 +33,20 @@ export async function GET(request: Request) {
 
     try {
         await dbConnect();
-        const files = await File.find({ userId }).sort({ isFolder: -1, name: 1 }).lean();
-        const tree = buildFileTree(files);
-        return NextResponse.json(tree);
+        const files = await File.find({ userId }).lean();
+        
+        // Sanitize the files for the client, converting ObjectIds to strings
+        const sanitizedFiles = files.map(file => ({
+            ...file,
+            _id: file._id.toString(),
+            userId: file.userId.toString(),
+            parentId: file.parentId ? file.parentId.toString() : null,
+            // Ensure client-side fields are present
+            isOpen: false,
+            isActive: false,
+        }));
+        
+        return NextResponse.json(sanitizedFiles);
     } catch (error) {
         console.error("GET /api/files Error:", error);
         return NextResponse.json({ error: "Failed to fetch files" }, { status: 500 });
@@ -91,6 +66,7 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
 
+        // Handle duplicating a file or folder
         if (action === 'duplicate') {
             const { sourceId } = await request.json();
             if (!mongoose.Types.ObjectId.isValid(sourceId)) {
@@ -102,68 +78,65 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: "Original item not found or permission denied" }, { status: 404 });
             }
 
-            // This map will store the mapping from old IDs to new IDs
-            const idMap = new Map<string, string>();
-
-            const duplicateRecursively = async (node: any, newParentId: string | null): Promise<any> => {
+            const duplicateRecursively = async (node: any, parentId: string | null): Promise<any> => {
                 const newId = new mongoose.Types.ObjectId();
-                idMap.set(node._id.toString(), newId.toString());
-
-                // Find all siblings to check for name collisions
-                const siblings = await File.find({ parentId: newParentId, userId }).lean();
-                const siblingNames = siblings.map(f => f.name);
+                const siblingNames = (await File.find({ parentId: parentId, userId }).lean()).map(f => f.name);
 
                 let newName = node.name;
-                let counter = 1;
-                let candidateName = newName;
-
-                if (node.isFolder) {
-                    candidateName = `${newName} copy`;
-                    while(siblingNames.includes(candidateName)) {
-                        counter++;
-                        candidateName = `${newName} copy ${counter}`;
-                    }
-                } else {
+                
+                if (!node.isFolder) {
                     const extIndex = newName.lastIndexOf('.');
                     const baseName = extIndex !== -1 ? newName.substring(0, extIndex) : newName;
                     const extension = extIndex !== -1 ? newName.substring(extIndex) : '';
-                    candidateName = `${baseName} copy${extension}`;
-                     while(siblingNames.includes(candidateName)) {
-                        counter++;
-                        candidateName = `${baseName} copy ${counter}${extension}`;
+                    
+                    let counter = 1;
+                    let candidateName = `${baseName} copy${extension}`;
+                    if(siblingNames.includes(candidateName)) {
+                        while (siblingNames.includes(candidateName)) {
+                            counter++;
+                            candidateName = `${baseName} copy ${counter}${extension}`;
+                        }
                     }
+                    newName = candidateName;
+                } else {
+                     let counter = 1;
+                    let candidateName = `${newName} copy`;
+                    if(siblingNames.includes(candidateName)) {
+                        while (siblingNames.includes(candidateName)) {
+                            counter++;
+                            candidateName = `${newName} copy ${counter}`;
+                        }
+                    }
+                    newName = candidateName;
                 }
-                newName = candidateName;
+
 
                 const newNodeData = {
                     ...node,
                     _id: newId,
                     userId,
-                    parentId: newParentId ? new mongoose.Types.ObjectId(newParentId) : null,
-                    name: newName,
+                    parentId,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 };
-                // Remove properties that should not be copied directly
                 delete newNodeData.children;
 
                 const newNodeDoc = await File.create(newNodeData);
-                const resultNode = newNodeDoc.toObject();
+                const newNode = newNodeDoc.toObject();
 
                 if (node.isFolder) {
-                    resultNode.children = [];
-                    const children = await File.find({ parentId: node._id, userId }).lean();
+                    const children = await File.find({ parentId: node._id, userId });
+                    newNode.children = [];
                     for (const child of children) {
-                        const newChild = await duplicateRecursively(child, newId.toString());
-                        resultNode.children.push(newChild);
+                        const newChild = await duplicateRecursively(child.toObject(), newId.toString());
+                        newNode.children.push(newChild);
                     }
                 }
-
-                // Serialize the result correctly
+                 // Serialize the result correctly
                 return {
-                    ...resultNode,
-                    _id: resultNode._id.toString(),
-                    parentId: resultNode.parentId ? resultNode.parentId.toString() : null,
+                    ...newNode,
+                    _id: newNode._id.toString(),
+                    parentId: newNode.parentId ? newNode.parentId.toString() : null,
                 };
             };
             
@@ -171,14 +144,14 @@ export async function POST(request: Request) {
             return NextResponse.json(duplicated, { status: 201 });
         }
 
-
+        // Handle bulk creation for repo cloning
         if (action === 'bulkCreate') {
-            const { items } = await request.json(); 
-             await File.deleteMany({ userId }); 
+            const { items } = await request.json(); // Expects an array of file objects
+             await File.deleteMany({ userId }); // Clear existing workspace
             
             const createdItems = [];
             const pathIdMap = new Map<string, string>();
-            items.sort((a: any, b: any) => a.path.localeCompare(b.path)); 
+            items.sort((a: any, b: any) => a.path.localeCompare(b.path)); // Process parent dirs first
 
             for (const item of items) {
                 const parts = item.path.split('/');
@@ -204,6 +177,7 @@ export async function POST(request: Request) {
             return NextResponse.json(createdItems, { status: 201 });
         }
         
+        // Handle single file/folder creation
         const fileData = await request.json();
         const newFile = new File({
             ...fileData,
@@ -237,8 +211,10 @@ export async function PUT(request: Request) {
     try {
         await dbConnect();
         const updates = await request.json();
+        // Ensure updatedAt is set
         updates.updatedAt = new Date();
 
+        // The client manages these, so don't let them be overwritten
         delete updates.isOpen;
         delete updates.isActive;
 
@@ -257,23 +233,6 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: "Failed to update file" }, { status: 500 });
     }
 }
-
-const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string): Promise<mongoose.Types.ObjectId[]> => {
-    const descendants: mongoose.Types.ObjectId[] = [];
-    const queue: mongoose.Types.ObjectId[] = [fileId];
-    
-    while(queue.length > 0) {
-        const currentId = queue.shift()!;
-        const children = await File.find({ parentId: currentId, userId });
-        for (const child of children) {
-            descendants.push(child._id);
-            if (child.isFolder) {
-                queue.push(child._id);
-            }
-        }
-    }
-    return descendants;
-};
 
 // DELETE a file/folder
 export async function DELETE(request: Request) {
@@ -297,6 +256,7 @@ export async function DELETE(request: Request) {
         }
     }
 
+
     if (!fileId) {
         return NextResponse.json({ error: "File ID is required" }, { status: 400 });
     }
@@ -310,6 +270,7 @@ export async function DELETE(request: Request) {
         
         let idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         
+        // If it's a folder, recursively find all descendant IDs
         if (fileToDelete.isFolder) {
             const descendantIds = await findDescendants(fileToDelete._id, userId);
             idsToDelete = idsToDelete.concat(descendantIds);
