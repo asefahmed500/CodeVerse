@@ -9,7 +9,7 @@ import { FileIcon } from './file-icon'
 import { Button } from '../ui/button'
 
 export function EditorTabs() {
-  const { files, updateFile, activeFileId, setActiveFileId } = useFileSystem()
+  const { files, closeFile, activeFileId, setActiveFileId } = useFileSystem()
   const router = useRouter()
 
   const openFiles = useMemo(() => {
@@ -30,11 +30,17 @@ export function EditorTabs() {
 
   const handleCloseTab = (e: React.MouseEvent, fileToClose: FileType) => {
     e.stopPropagation()
-    updateFile(fileToClose._id, { isOpen: false, isActive: false })
 
+    // Predict the next state before dispatching the update
+    const remainingOpenFiles = openFiles.filter(f => f._id !== fileToClose._id);
+
+    // Dispatch the state update
+    closeFile(fileToClose._id)
+
+    // Act on the predicted state
     if (activeFileId === fileToClose._id) {
-      const remainingOpenFiles = openFiles.filter(f => f._id !== fileToClose._id && f.isOpen)
       if (remainingOpenFiles.length > 0) {
+        // The list is already sorted by most recently used
         const newActiveFile = remainingOpenFiles[0]
         setActiveFileId(newActiveFile._id)
         router.push(`/editor/${newActiveFile._id}`)

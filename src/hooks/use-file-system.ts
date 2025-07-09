@@ -18,7 +18,6 @@ const buildFileTree = (files: FileType[]): FileType[] => {
     files.forEach(file => {
         if (file.parentId && fileMap.has(file.parentId)) {
             const parent = fileMap.get(file.parentId);
-            // Ensure children array exists before pushing
             if (parent && parent.children) {
                  parent.children.push(fileMap.get(file._id)!);
             }
@@ -66,6 +65,7 @@ interface FileSystemState {
   deleteFile: (fileId: string) => Promise<{ nextActiveFileId: string | null }>;
   duplicateFileOrFolder: (fileId: string) => Promise<void>;
   setActiveFileId: (fileId: string | null) => void;
+  closeFile: (fileId: string) => void;
   toggleFolder: (folderId: string) => void;
   searchFiles: (query: string) => Promise<SearchResult[]>;
   replaceInFiles: (query: string, replaceWith: string) => Promise<void>;
@@ -280,19 +280,29 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             
             const { deletedIds } = await res.json();
             
-            set(produce((state: FileSystemState) => {
-                state.allFiles = state.allFiles.filter(f => !deletedIds.includes(f._id));
-                state.files = buildFileTree(state.allFiles);
+            let nextActiveFileId: string | null = get().activeFileId;
 
-                if (state.activeFileId && deletedIds.includes(state.activeFileId)) {
+            set(produce((state: FileSystemState) => {
+                const originalActiveId = state.activeFileId;
+                state.allFiles = state.allFiles.filter(f => !deletedIds.includes(f._id));
+
+                if (originalActiveId && deletedIds.includes(originalActiveId)) {
                     const openFiles = state.allFiles.filter(f => !f.isFolder && f.isOpen && !deletedIds.includes(f._id));
                     openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-                    state.activeFileId = openFiles[0]?._id ?? null;
+                    const newActiveFile = openFiles[0] ?? null;
+                    state.activeFileId = newActiveFile?._id ?? null;
+                    
+                    state.allFiles.forEach(f => {
+                       f.isActive = f._id === state.activeFileId;
+                    });
                 }
+                
+                nextActiveFileId = state.activeFileId;
+                state.files = buildFileTree(state.allFiles);
             }));
 
             toast.success(`Deleted ${fileToDelete.name}.`, { id: toastId });
-            return { nextActiveFileId: get().activeFileId };
+            return { nextActiveFileId };
         } catch(e: any) {
             toast.error(e.message, { id: toastId });
             return { nextActiveFileId: get().activeFileId };
@@ -343,17 +353,28 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
     setActiveFileId: (fileId) => {
         set(produce((state: FileSystemState) => {
-            const currentActive = state.allFiles.find(f => f._id === state.activeFileId);
-            if (currentActive) currentActive.isActive = false;
-
-            const newActive = fileId ? state.allFiles.find(f => f._id === fileId) : null;
-            if (newActive) {
-                newActive.isActive = true;
-                if (!newActive.isFolder) {
-                    newActive.isOpen = true;
+            state.allFiles.forEach(f => {
+                f.isActive = f._id === fileId;
+                if(f.isActive && !f.isFolder) {
+                    f.isOpen = true;
+                }
+            });
+            state.activeFileId = fileId;
+            state.files = buildFileTree(state.allFiles);
+        }));
+    },
+    
+    closeFile: (fileId: string) => {
+        set(produce((state: FileSystemState) => {
+            const file = state.allFiles.find(f => f._id === fileId);
+            if (file) {
+                file.isOpen = false;
+                if (file.isActive) {
+                    file.isActive = false;
+                    state.activeFileId = null;
                 }
             }
-            state.activeFileId = fileId;
+            state.files = buildFileTree(state.allFiles);
         }));
     },
 
