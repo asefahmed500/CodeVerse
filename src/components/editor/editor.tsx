@@ -1,7 +1,8 @@
+
 "use client";
 
 import Editor, { OnChange, type OnMount } from "@monaco-editor/react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FileType } from "@/types";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -16,9 +17,14 @@ import { getSnippets } from "@/config/snippets";
 import { useDebugStore } from "@/hooks/use-debug-store";
 import type * as monaco from 'monaco-editor';
 
-export function CodeEditor({ file }: { file: FileType }) {
+export function Editor({ initialFile }: { initialFile: FileType }) {
   const { theme } = useTheme();
-  const { updateFile, updateFileContentLocally } = useFileSystem();
+  // We use the initialFile prop to seed the state, but then rely on the zustand store for updates.
+  const { findFile, updateFile, updateFileContentLocally, setActiveFileId } = useFileSystem();
+  
+  // The file from the store is the most up-to-date version
+  const file = findFile(initialFile._id) || initialFile;
+
   const { setEditor, setSaveHandler, setCursorPosition, breakpoints, toggleBreakpoint, editor } = useEditorStore();
   const { fontSize, tabSize, wordWrap, minimap, vimMode } = useEditorSettingsStore();
   const { isDebugging, isPaused, currentLine, activeFile: debugFile } = useDebugStore();
@@ -28,6 +34,11 @@ export function CodeEditor({ file }: { file: FileType }) {
   const monacoRef = useRef<typeof monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const debugDecorationsRef = useRef<string[]>([]);
+
+  // Ensure the active file is set in the global state when the page loads
+  useEffect(() => {
+    setActiveFileId(file._id);
+  }, [file._id, setActiveFileId]);
 
   const fileContentRef = useRef(file.content);
   useEffect(() => {
