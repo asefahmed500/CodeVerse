@@ -22,11 +22,12 @@ export default function EditorFilePage() {
   const params = useParams();
   const fileId = params.fileId as string;
   const router = useRouter();
-  const { findFile, setActiveFileId, loading: fileSystemLoading } = useFileSystem();
+  const { findFile, setActiveFileId, loading: fileSystemLoading, allFiles } = useFileSystem();
 
   const fileToRender = findFile(fileId);
 
   useEffect(() => {
+    // Rely on allFiles dependency to re-run this effect when the file list changes.
     if (fileSystemLoading) return;
 
     const file = findFile(fileId);
@@ -38,18 +39,22 @@ export default function EditorFilePage() {
       }
       setActiveFileId(fileId);
     } else {
-      // If the file isn't found after loading, it's a true 404
-      // You might want to redirect to a custom 404 page or the editor home
-      router.replace('/editor');
+      // If the file isn't found after loading, it might be a true 404
+      // or the state hasn't propagated yet. The loading guard below handles the latter.
+      // If it's still not found after loading, redirect.
+      if (!fileSystemLoading) {
+         router.replace('/editor');
+      }
     }
-  }, [fileId, fileSystemLoading, findFile, router, setActiveFileId]);
+  }, [fileId, fileSystemLoading, findFile, router, setActiveFileId, allFiles]);
 
   // This is the main loading guard. It waits for both the file system to be loaded
-  // AND for the specific file to be available in the state.
+  // AND for the specific file to be available in the state. This fixes the race condition.
   if (fileSystemLoading || !fileToRender) {
     return (
       <div className="flex items-center justify-center flex-1 h-full bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-4">Loading file...</p>
       </div>
     );
   }

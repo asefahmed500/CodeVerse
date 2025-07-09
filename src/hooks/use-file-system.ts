@@ -261,7 +261,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         if (!fileToDelete) return { nextActiveFileId: null };
 
         let nextActiveFileId: string | null = get().activeFileId;
-        const wasActive = get().activeFileId === fileId;
 
         try {
             const res = await fetch(`/api/files?fileId=${fileId}`, { method: 'DELETE' });
@@ -275,14 +274,16 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             set(produce((state: FileSystemState) => {
                 state.allFiles = state.allFiles.filter(f => !deletedIds.includes(f._id));
                 state.files = buildFileTree(state.allFiles);
+
+                // If the deleted file or a containing folder was active, find a new active file
+                if (state.activeFileId && deletedIds.includes(state.activeFileId)) {
+                    const openFiles = state.allFiles.filter(f => !f.isFolder && f.isOpen && !deletedIds.includes(f._id));
+                    openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                    state.activeFileId = openFiles[0]?._id ?? null;
+                }
             }));
 
-            if (wasActive || (fileToDelete.isFolder && get().activeFileId && deletedIds.includes(get().activeFileId))) {
-                const openFiles = get().allFiles.filter(f => !f.isFolder && f.isOpen);
-                openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-                nextActiveFileId = openFiles.find(f => !deletedIds.includes(f._id))?._id ?? null;
-            }
-            
+            nextActiveFileId = get().activeFileId;
             toast.success(`Deleted ${fileToDelete.name}.`);
             return { nextActiveFileId };
         } catch(e: any) {
@@ -308,22 +309,27 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 throw new Error(data.error || "Failed to duplicate item.");
             }
             
+            // The API now returns the full duplicated structure
             const duplicatedItem: FileType = await res.json();
             const itemsToAdd: FileType[] = [duplicatedItem];
             
-            if (duplicatedItem.isFolder && duplicatedItem.children) {
-                 const flattenChildren = (node: FileType): FileType[] => {
-                    let flat: FileType[] = [];
-                    if (node.children) {
-                        node.children.forEach(child => {
-                            flat.push(child);
-                            if (child.isFolder) {
-                                flat = flat.concat(flattenChildren(child));
-                            }
-                        });
-                    }
-                    return flat;
-                };
+            // Helper to flatten the nested children from the API response
+            const flattenChildren = (node: FileType): FileType[] => {
+                let flat: FileType[] = [];
+                if (node.children) {
+                    node.children.forEach(child => {
+                        const childCopy = { ...child };
+                        delete childCopy.children; // Don't include children in the flat list item
+                        flat.push(childCopy);
+                        if (child.isFolder) {
+                            flat = flat.concat(flattenChildren(child));
+                        }
+                    });
+                }
+                return flat;
+            };
+
+            if (duplicatedItem.isFolder) {
                 itemsToAdd.push(...flattenChildren(duplicatedItem));
             }
             
