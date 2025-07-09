@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { X, SplitSquareHorizontal, BookText, Sparkles } from 'lucide-react'
+import { X, SplitSquareHorizontal } from 'lucide-react'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { useRouter } from 'next/navigation'
 import type { FileType } from '@/types'
@@ -75,12 +75,6 @@ export function EditorTabs() {
        <div className="flex items-center pr-2">
         <Button variant="ghost" size="icon" className="h-8 w-8">
             <SplitSquareHorizontal size={16} />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-            <BookText size={16} />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Sparkles size={16} />
         </Button>
       </div>
     </div>

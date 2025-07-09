@@ -7,7 +7,7 @@ import { type ThemeProviderProps } from 'next-themes/dist/types';
 export function Providers({ children }: { children: React.ReactNode }) {
   const themeProps: ThemeProviderProps = {
     attribute: 'class',
-    defaultTheme: 'light',
+    defaultTheme: 'dark',
     enableSystem: false,
   };
 

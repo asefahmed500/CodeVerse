@@ -3,11 +3,9 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, X, TerminalSquare, MessageSquareWarning, Sparkles, PencilRuler } from "lucide-react";
+import { ChevronDown, ChevronUp, X, TerminalSquare, MessageSquareWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
-import { ExplainView } from "./explain-view";
-import { FixView } from "./fix-view";
 import { useProblemsStore } from "@/hooks/use-problems-store";
 import { useActiveView } from "@/hooks/use-active-view";
 
@@ -29,7 +27,7 @@ export function Panel() {
   const { problems } = useProblemsStore();
   const { activeView: activePanel, openView, toggleActiveView } = useActiveView();
   
-  const isPanelVisible = ['problems', 'terminal', 'fix', 'explain'].includes(activePanel || '');
+  const isPanelVisible = ['problems', 'terminal'].includes(activePanel || '');
 
   const handleTabChange = (value: string) => {
     openView(value as any);
@@ -79,18 +77,6 @@ export function Panel() {
             >
               <TerminalSquare className="h-4 w-4" /> Terminal
             </TabsTrigger>
-             <TabsTrigger
-              value="fix"
-              className="h-full text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3 flex items-center gap-2"
-            >
-              <PencilRuler className="h-4 w-4" /> Fix & Refactor
-            </TabsTrigger>
-             <TabsTrigger
-              value="explain"
-              className="h-full text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3 flex items-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" /> Explain
-            </TabsTrigger>
           </TabsList>
 
           <div className="flex items-center gap-1">
@@ -124,12 +110,6 @@ export function Panel() {
             </TabsContent>
             <TabsContent value="terminal" className="h-full mt-0">
               <TerminalManager />
-            </TabsContent>
-             <TabsContent value="fix" className="h-full mt-0">
-              <FixView />
-            </TabsContent>
-             <TabsContent value="explain" className="h-full mt-0">
-              <ExplainView />
             </TabsContent>
           </div>
         )}
