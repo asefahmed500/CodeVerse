@@ -31,6 +31,22 @@ const buildTree = (files: any[]): FileType[] => {
         }
     });
 
+    // Sort children alphabetically, folders first
+    const sortChildren = (nodes: FileType[]) => {
+      nodes.sort((a, b) => {
+        if (a.isFolder && !b.isFolder) return -1;
+        if (!a.isFolder && b.isFolder) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      nodes.forEach(node => {
+        if (node.children) {
+          sortChildren(node.children);
+        }
+      });
+    };
+    sortChildren(tree);
+
+
     return tree;
 }
 
@@ -258,19 +274,19 @@ export async function DELETE(request: Request) {
         
         const idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         
+        // If it's a folder, recursively find all descendant IDs
         if (fileToDelete.isFolder) {
-             const descendants = await File.find({ userId, parentId: fileToDelete._id });
-             const queue = [...descendants];
-             while(queue.length > 0) {
-                 const current = queue.shift();
-                 if(current) {
-                     idsToDelete.push(current._id);
-                     if(current.isFolder) {
-                         const children = await File.find({ userId, parentId: current._id });
-                         queue.push(...children);
-                     }
-                 }
-             }
+            const queue: mongoose.Types.ObjectId[] = [fileToDelete._id];
+            while (queue.length > 0) {
+                const parentId = queue.shift();
+                const children = await File.find({ userId, parentId });
+                for (const child of children) {
+                    idsToDelete.push(child._id);
+                    if (child.isFolder) {
+                        queue.push(child._id);
+                    }
+                }
+            }
         }
 
         const uniqueIds = [...new Set(idsToDelete.map(id => id.toString()))];

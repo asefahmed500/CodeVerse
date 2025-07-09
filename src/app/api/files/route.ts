@@ -31,6 +31,22 @@ const buildTree = (files: any[]): FileType[] => {
         }
     });
 
+    // Sort children alphabetically, folders first
+    const sortChildren = (nodes: FileType[]) => {
+      nodes.sort((a, b) => {
+        if (a.isFolder && !b.isFolder) return -1;
+        if (!a.isFolder && b.isFolder) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      nodes.forEach(node => {
+        if (node.children) {
+          sortChildren(node.children);
+        }
+      });
+    };
+    sortChildren(tree);
+
+
     return tree;
 }
 
@@ -44,7 +60,7 @@ export async function GET(request: Request) {
 
     try {
         await dbConnect();
-        const files = await File.find({ userId }).lean();
+        const files = await File.find({ userId }).sort({ isFolder: -1, name: 1 }).lean();
         const tree = buildTree(files);
         return NextResponse.json(tree);
     } catch (error) {
@@ -79,15 +95,28 @@ export async function POST(request: Request) {
                 const siblingNames = (await File.find({ parentId: parentId, userId }).lean()).map(f => f.name);
 
                 let newName = node.name;
-                const extIndex = newName.lastIndexOf('.');
-                const baseName = extIndex !== -1 ? newName.substring(0, extIndex) : newName;
-                const extension = extIndex !== -1 ? newName.substring(extIndex) : '';
                 
-                let counter = 1;
-                do {
-                    newName = `${baseName}${counter > 1 ? ` copy ${counter}` : ' copy'}${extension}`;
-                    counter++;
-                } while (siblingNames.includes(newName));
+                if (!node.isFolder) {
+                    const extIndex = newName.lastIndexOf('.');
+                    const baseName = extIndex !== -1 ? newName.substring(0, extIndex) : newName;
+                    const extension = extIndex !== -1 ? newName.substring(extIndex) : '';
+                    
+                    let counter = 1;
+                    let candidateName = `${baseName} copy${extension}`;
+                    while (siblingNames.includes(candidateName)) {
+                        counter++;
+                        candidateName = `${baseName} copy ${counter}${extension}`;
+                    }
+                    newName = candidateName;
+                } else {
+                     let counter = 1;
+                    let candidateName = `${newName} copy`;
+                    while (siblingNames.includes(candidateName)) {
+                        counter++;
+                        candidateName = `${newName} copy ${counter}`;
+                    }
+                    newName = candidateName;
+                }
 
 
                 const newNodeData = {
@@ -101,14 +130,18 @@ export async function POST(request: Request) {
                 };
                 delete newNodeData.children;
 
-                const newNode = await File.create(newNodeData);
+                const newNodeDoc = await File.create(newNodeData);
+                const newNode = newNodeDoc.toObject();
+
                 if (node.isFolder) {
                     const children = await File.find({ parentId: node._id, userId });
+                    newNode.children = [];
                     for (const child of children) {
-                        await duplicateRecursively(child.toObject(), newId.toString());
+                        const newChild = await duplicateRecursively(child.toObject(), newId.toString());
+                        newNode.children.push(newChild);
                     }
                 }
-                return newNode.toObject();
+                return newNode;
             };
             
             const duplicated = await duplicateRecursively(original, original.parentId ? original.parentId.toString() : null);
@@ -137,11 +170,13 @@ export async function POST(request: Request) {
                     parentId,
                 });
                 const savedItem = await newItem.save();
+                const savedObject = savedItem.toObject();
+
 
                 if (item.isFolder) {
                     pathIdMap.set(item.path, savedItem._id.toString());
                 }
-                createdItems.push(savedItem);
+                createdItems.push({ ...savedObject, _id: savedObject._id.toString(), parentId: savedObject.parentId?.toString() || null });
             }
             return NextResponse.json(createdItems, { status: 201 });
         }
@@ -153,7 +188,8 @@ export async function POST(request: Request) {
             userId,
         });
         await newFile.save();
-        return NextResponse.json(newFile, { status: 201 });
+        const savedObject = newFile.toObject();
+        return NextResponse.json({ ...savedObject, _id: savedObject._id.toString(), parentId: savedObject.parentId?.toString() || null }, { status: 201 });
 
     } catch (error) {
         console.error("POST /api/files Error:", error);
@@ -190,12 +226,12 @@ export async function PUT(request: Request) {
             { _id: fileId, userId },
             { $set: updates },
             { new: true }
-        );
+        ).lean();
 
         if (!updatedFile) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
-        return NextResponse.json(updatedFile);
+        return NextResponse.json({ ...updatedFile, _id: updatedFile._id.toString(), parentId: updatedFile.parentId?.toString() || null });
     } catch (error) {
         console.error("PUT /api/files Error:", error);
         return NextResponse.json({ error: "Failed to update file" }, { status: 500 });
@@ -236,32 +272,27 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
         
-        const idsToDelete: mongoose.Types.ObjectId[] = [];
+        const idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         
+        // If it's a folder, recursively find all descendant IDs
         if (fileToDelete.isFolder) {
-             const aggregateResult = await File.aggregate([
-                { $match: { _id: new mongoose.Types.ObjectId(fileId) } },
-                {
-                    $graphLookup: {
-                        from: 'files',
-                        startWith: '$_id',
-                        connectFromField: '_id',
-                        connectToField: 'parentId',
-                        as: 'descendants',
-                        depthField: 'depth'
+            const queue: mongoose.Types.ObjectId[] = [fileToDelete._id];
+            while (queue.length > 0) {
+                const parentId = queue.shift();
+                const children = await File.find({ userId, parentId });
+                for (const child of children) {
+                    idsToDelete.push(child._id);
+                    if (child.isFolder) {
+                        queue.push(child._id);
                     }
-                },
-                { $unwind: '$descendants' },
-                { $replaceRoot: { newRoot: '$descendants' } }
-            ]);
-            idsToDelete.push(...aggregateResult.map(doc => doc._id));
+                }
+            }
         }
-        idsToDelete.push(fileToDelete._id);
 
         const uniqueIds = [...new Set(idsToDelete.map(id => id.toString()))];
         await File.deleteMany({ _id: { $in: uniqueIds }, userId });
 
-        return NextResponse.json({ message: "Deleted successfully" }, { status: 200 });
+        return NextResponse.json({ message: "Deleted successfully", deletedIds: uniqueIds }, { status: 200 });
     } catch (error) {
         console.error("DELETE /api/files Error:", error);
         return NextResponse.json({ error: "Failed to delete file(s)" }, { status: 500 });
