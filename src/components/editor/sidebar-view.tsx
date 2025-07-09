@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useActiveView, type ActiveView } from "@/hooks/use-active-view";
@@ -39,11 +40,21 @@ export function SidebarView() {
       </div>
 
       <div className="flex-1 min-h-0">
-        {activeView === 'explorer' && <Explorer />}
-        {activeView === 'search' && <SearchView />}
-        {activeView === 'github' && <GitHubView />}
-        {activeView === 'debug' && <DebugView />}
-        {activeView === 'settings' && <SettingsView />}
+        <div hidden={activeView !== 'explorer'} className="h-full w-full">
+          <Explorer />
+        </div>
+        <div hidden={activeView !== 'search'} className="h-full w-full">
+          <SearchView />
+        </div>
+        <div hidden={activeView !== 'github'} className="h-full w-full">
+          <GitHubView />
+        </div>
+        <div hidden={activeView !== 'debug'} className="h-full w-full">
+          <DebugView />
+        </div>
+        <div hidden={activeView !== 'settings'} className="h-full w-full">
+          <SettingsView />
+        </div>
       </div>
     </div>
   );
