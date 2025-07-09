@@ -147,6 +147,7 @@ export function GitHubView() {
   }
   
   const isWorkspaceEmpty = !loading && files.length === 0;
+  const hasGithubAuth = !!(session?.user as any)?.accessToken;
 
   return (
     <div className="h-full flex flex-col bg-card text-card-foreground">
@@ -156,6 +157,22 @@ export function GitHubView() {
       
       {status === 'loading' && <p className="p-4 text-sm text-muted-foreground">Loading authentication...</p>}
       
+      {status === 'authenticated' && (
+        hasGithubAuth ? (
+          // User is fully authenticated with GitHub
+          isWorkspaceEmpty ? <CloneView /> : <CommitView />
+        ) : (
+          // User is authenticated with credentials, needs to link GitHub
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+            <Github className="h-10 w-10 text-muted-foreground mb-4" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Connect your GitHub account to clone repositories and manage source control.
+            </p>
+            <Button onClick={() => signIn('github')}>Connect with GitHub</Button>
+          </div>
+        )
+      )}
+      
       {status === 'unauthenticated' && (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
             <Github className="h-10 w-10 text-muted-foreground mb-4" />
@@ -164,10 +181,6 @@ export function GitHubView() {
             </p>
             <Button onClick={() => signIn('github')}>Sign in with GitHub</Button>
         </div>
-      )}
-
-      {status === 'authenticated' && (
-        isWorkspaceEmpty ? <CloneView /> : <CommitView />
       )}
     </div>
   )
