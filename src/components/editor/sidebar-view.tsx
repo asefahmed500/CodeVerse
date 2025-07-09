@@ -16,14 +16,14 @@ import {
 import { allViews } from "@/config/views";
 
 export function SidebarView() {
-  const { activeView, setActiveView } = useActiveView();
+  const { activeView, openView } = useActiveView();
 
   return (
     <div className="h-full w-full flex flex-col">
       <div className="p-2 border-b border-border md:hidden">
         <Select
           value={activeView || ""}
-          onValueChange={(v) => setActiveView(v as ActiveView)}
+          onValueChange={(v) => openView(v as ActiveView)}
         >
           <SelectTrigger className="w-full bg-background border-input">
             <SelectValue placeholder="Select a view" />
