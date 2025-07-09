@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil, Folder } from "lucide-react";
@@ -18,7 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
-import { getLanguageConfigFromFilename } from "@/config/languages";
 
 function CreationInput({
   type,
@@ -31,7 +31,6 @@ function CreationInput({
   depth: number;
   onComplete: () => void;
 }) {
-  const { createFile, createFolder } = useFileSystem();
   const [name, setName] = useState('');
   const router = useRouter();
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -40,20 +39,13 @@ function CreationInput({
     inputRef.current?.focus();
   }, []);
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
     if (!name.trim()) {
       onComplete();
       return;
     }
-
-    if (type === 'file') {
-      const newFile = await createFile(name, parentId);
-      if (newFile) {
-        router.replace(`/editor/${newFile._id}`);
-      }
-    } else {
-      await createFolder(name, parentId);
-    }
+    const parentIdParam = parentId ? `&parentId=${parentId}` : '';
+    router.push(`/editor/create?type=${type}&name=${encodeURIComponent(name)}${parentIdParam}`);
     onComplete();
   };
 
