@@ -18,7 +18,7 @@ import type * as monaco from 'monaco-editor';
 
 export function CodeEditor({ file }: { file: FileType }) {
   const { theme } = useTheme();
-  const { updateFile } = useFileSystem();
+  const { updateFile, updateFileContentLocally } = useFileSystem();
   const { setEditor, setSaveHandler, setCursorPosition, breakpoints, toggleBreakpoint, editor } = useEditorStore();
   const { fontSize, tabSize, wordWrap, minimap, vimMode } = useEditorSettingsStore();
   const { isDebugging, isPaused, currentLine, activeFile: debugFile } = useDebugStore();
@@ -35,7 +35,7 @@ export function CodeEditor({ file }: { file: FileType }) {
   }, [file.content]);
   
   const immediateSave = useCallback((currentContent: string) => {
-    updateFile(file._id, { content: currentContent }, { optimistic: true });
+    updateFile(file._id, { content: currentContent });
     toast.success(`${file.name} saved.`);
   }, [file._id, file.name, updateFile]);
   
@@ -46,15 +46,15 @@ export function CodeEditor({ file }: { file: FileType }) {
   const handleEditorChange: OnChange = (value) => {
     const newContent = value || "";
     fileContentRef.current = newContent;
-    updateFile(file._id, { content: newContent }, { optimistic: true, noUpdate: true });
+    updateFileContentLocally(file._id, newContent); // Instant local update for responsive UI
     debouncedSave();
   };
   
   useEffect(() => {
-    const handler = () => immediateSave(file.content);
+    const handler = () => immediateSave(fileContentRef.current);
     setSaveHandler(() => handler);
     return () => setSaveHandler(null);
-  }, [immediateSave, file.content, setSaveHandler]);
+  }, [immediateSave, setSaveHandler]);
 
   useEffect(() => {
     if (editor) {

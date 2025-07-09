@@ -52,7 +52,8 @@ interface FileSystemState {
   getPathForFile: (fileId: string) => string;
   createFile: (name: string, parentId?: string | null, content?: string) => Promise<FileType | null>;
   createFolder: (name: string, parentId?: string | null) => Promise<FileType | null>;
-  updateFile: (fileId: string, updates: Partial<FileType>, options?: { optimistic?: boolean, noUpdate?: boolean }) => Promise<void>;
+  updateFile: (fileId: string, updates: Partial<FileType>) => Promise<void>;
+  updateFileContentLocally: (fileId: string, content: string) => void;
   deleteFile: (fileId: string) => Promise<{ nextActiveFileId: string | null }>;
   duplicateFileOrFolder: (fileId: string) => Promise<void>;
   setActiveFileId: (fileId: string | null) => void;
@@ -191,28 +192,22 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         return get().findFile(newFolder._id);
     },
 
-    updateFile: async (fileId, updates, options = { optimistic: false }) => {
-        const originalFile = get().findFile(fileId);
-        const contentChanged = updates.content !== undefined && updates.content !== originalFile?.content;
-
-        if (contentChanged) {
-            set(produce((state: FileSystemState) => {
-                if (!state.dirtyFileIds.includes(fileId)) {
-                    state.dirtyFileIds.push(fileId);
-                }
-            }));
+    updateFileContentLocally: (fileId, content) => {
+      set(produce((state: FileSystemState) => {
+        const file = state.allFiles.find(f => f._id === fileId);
+        if (file) {
+          file.content = content;
         }
-
-        if (options.optimistic && !options.noUpdate) {
-            set(produce((state: FileSystemState) => {
-                const file = state.allFiles.find(f => f._id === fileId);
-                if (file) Object.assign(file, updates);
-                state.files = buildFileTree(state.allFiles);
-            }));
+        if (!state.dirtyFileIds.includes(fileId)) {
+          state.dirtyFileIds.push(fileId);
         }
-        
-        if (updates.name && updates.name !== get().findFile(fileId)?.name) {
-             updates.language = getLanguageConfigFromFilename(updates.name).monacoLanguage;
+      }));
+    },
+
+    updateFile: async (fileId, updates) => {
+        const nameChanged = 'name' in updates;
+        if (nameChanged && updates.name) {
+            updates.language = getLanguageConfigFromFilename(updates.name).monacoLanguage;
         }
 
         const res = await fetch(`/api/files?fileId=${fileId}`, {
@@ -223,18 +218,24 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         
         if (!res.ok) {
             toast.error("Failed to save file.");
-            get().fetchFiles();
+            get().fetchFiles(); // Re-sync with server on failure
             return;
         }
 
         const updatedFile = await res.json();
         set(produce((state: FileSystemState) => {
             const file = state.allFiles.find(f => f._id === fileId);
-            if(file) Object.assign(file, updatedFile);
-            state.files = buildFileTree(state.allFiles);
+            if(file) {
+              Object.assign(file, updatedFile);
+            }
+            if(nameChanged) {
+                state.files = buildFileTree(state.allFiles);
+            }
         }));
 
-        if(!options.optimistic && !contentChanged) toast.success(`Saved ${updatedFile.name}.`);
+        if (!('content' in updates)) {
+          toast.success(`Saved ${updatedFile.name}.`);
+        }
     },
 
     deleteFile: async (fileId) => {
