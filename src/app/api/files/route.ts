@@ -76,12 +76,26 @@ export async function POST(request: Request) {
 
             const duplicateRecursively = async (node: any, parentId: string | null): Promise<any> => {
                 const newId = new mongoose.Types.ObjectId();
+                const siblingNames = (await File.find({ parentId: parentId, userId }).lean()).map(f => f.name);
+
+                let newName = node.name;
+                const extIndex = newName.lastIndexOf('.');
+                const baseName = extIndex !== -1 ? newName.substring(0, extIndex) : newName;
+                const extension = extIndex !== -1 ? newName.substring(extIndex) : '';
+                
+                let counter = 1;
+                do {
+                    newName = `${baseName}${counter > 1 ? ` copy ${counter}` : ' copy'}${extension}`;
+                    counter++;
+                } while (siblingNames.includes(newName));
+
+
                 const newNodeData = {
                     ...node,
                     _id: newId,
                     userId,
                     parentId,
-                    name: node.name,
+                    name: newName,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 };
@@ -197,6 +211,19 @@ export async function DELETE(request: Request) {
     const userId = (session.user as any).id;
     const { searchParams } = new URL(request.url);
     const fileId = searchParams.get('fileId');
+    const action = searchParams.get('action');
+
+     if (action === 'resetAll') {
+        try {
+            await dbConnect();
+            await File.deleteMany({ userId });
+            return NextResponse.json({ message: "Workspace reset successfully" }, { status: 200 });
+        } catch (error) {
+            console.error("DELETE /api/files?action=resetAll Error:", error);
+            return NextResponse.json({ error: "Failed to reset workspace" }, { status: 500 });
+        }
+    }
+
 
     if (!fileId) {
         return NextResponse.json({ error: "File ID is required" }, { status: 400 });
@@ -208,28 +235,29 @@ export async function DELETE(request: Request) {
         if (!fileToDelete) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
-
-        const idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
-        // If it's a folder, find all descendants to delete
+        
+        const idsToDelete: mongoose.Types.ObjectId[] = [];
+        
         if (fileToDelete.isFolder) {
-            const aggregateResult = await File.aggregate([
-                { $match: { _id: fileToDelete._id, userId: new mongoose.Types.ObjectId(userId) } },
+             const aggregateResult = await File.aggregate([
+                { $match: { _id: new mongoose.Types.ObjectId(fileId) } },
                 {
                     $graphLookup: {
                         from: 'files',
                         startWith: '$_id',
                         connectFromField: '_id',
                         connectToField: 'parentId',
-                        as: 'descendants'
+                        as: 'descendants',
+                        depthField: 'depth'
                     }
                 },
-                { $project: { allIds: { $concatArrays: [['$_id'], '$descendants._id'] } } }
+                { $unwind: '$descendants' },
+                { $replaceRoot: { newRoot: '$descendants' } }
             ]);
-            if (aggregateResult.length > 0) {
-                idsToDelete.push(...aggregateResult[0].allIds);
-            }
+            idsToDelete.push(...aggregateResult.map(doc => doc._id));
         }
-        
+        idsToDelete.push(fileToDelete._id);
+
         const uniqueIds = [...new Set(idsToDelete.map(id => id.toString()))];
         await File.deleteMany({ _id: { $in: uniqueIds }, userId });
 

@@ -236,23 +236,25 @@ function FileTreeItem({
     setEditingValue(file.name);
   }
 
-  const handleDuplicate = async (e: Event) => {
-    e.preventDefault();
+  const handleDuplicate = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     await duplicateFileOrFolder(file._id);
   }
   
   const handleNewFile = (e: Event) => {
     e.preventDefault();
+    e.stopPropagation();
     onStartCreation('file', file._id);
   }
   
   const handleNewFolder = (e: Event) => {
     e.preventDefault();
+    e.stopPropagation();
     onStartCreation('folder', file._id);
   }
 
-  const handleDelete = async (e: Event) => {
-    e.preventDefault();
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     const wasActive = activeFileId === file._id;
     const { nextActiveFileId } = await deleteFile(file._id);
     
@@ -268,6 +270,7 @@ function FileTreeItem({
 
   const handleRenameClick = (e: Event) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsEditing(true);
   }
   
@@ -311,7 +314,7 @@ function FileTreeItem({
             </>
           )}
         </div>
-      <DropdownMenuContent className="w-48" align="start">
+      <DropdownMenuContent className="w-48" align="start" onContextMenu={(e) => e.preventDefault()}>
           {file.isFolder && (
             <>
               <DropdownMenuItem onSelect={handleNewFile}>
@@ -329,11 +332,11 @@ function FileTreeItem({
             <Pencil className="mr-2 h-4 w-4" />
             <span>Rename</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleDuplicate}>
+          <DropdownMenuItem onSelect={(e) => handleDuplicate(e as any)}>
             <Copy className="mr-2 h-4 w-4" />
             <span>Duplicate</span>
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={handleDelete}>
+          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => handleDelete(e as any)}>
             <X className="mr-2 h-4 w-4" />
             <span>Delete</span>
           </DropdownMenuItem>

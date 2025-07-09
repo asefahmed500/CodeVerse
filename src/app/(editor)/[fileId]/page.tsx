@@ -27,23 +27,22 @@ export default function EditorFilePage() {
   const fileToRender = findFile(fileId);
 
   useEffect(() => {
-    // This effect handles setting the active file and redirecting if the ID points to a folder.
-    if (fileToRender) {
-      if (fileToRender.isFolder) {
-        // If the route is for a folder, it's not a valid editor page. Redirect.
+    if (fileSystemLoading) return;
+
+    const file = findFile(fileId);
+    if (file) {
+      if (file.isFolder) {
         router.replace('/editor');
         return;
       }
-      // If the file is valid, ensure it's marked as active in the global state.
       setActiveFileId(fileId);
+    } else {
+      // If the file isn't found after loading, it's a true 404
+      // You might want to redirect to a custom 404 page or the editor home
+      router.replace('/editor');
     }
-    // If fileToRender is null, we wait. The spinner below will be shown.
-    // The component will re-render once the file system state updates.
-  }, [fileId, fileToRender, router, setActiveFileId]);
+  }, [fileId, fileSystemLoading, findFile, router, setActiveFileId]);
 
-  // Render a spinner if the file system is still loading initially,
-  // or if the specific file for this route hasn't been found in the state yet.
-  // This is key to preventing the 404 race condition.
   if (fileSystemLoading || !fileToRender) {
     return (
       <div className="flex items-center justify-center flex-1 h-full bg-background">
@@ -52,7 +51,6 @@ export default function EditorFilePage() {
     );
   }
   
-  // This check is a safeguard, but the useEffect should handle the redirect.
   if (fileToRender.isFolder) {
       return null;
   }

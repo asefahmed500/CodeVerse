@@ -22,13 +22,19 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useEditorStore } from '@/hooks/use-editor-store'
+import { useRouter } from 'next/navigation'
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme()
   const { activeView } = useActiveView()
   const { reset: resetFileSystem } = useFileSystem()
   const { reset: resetTerminals } = useTerminalManager()
+  const { reset: resetEditor } = useEditorStore();
+  const router = useRouter();
+
   const [isResetAlertOpen, setResetAlertOpen] = useState(false);
 
   const {
@@ -44,12 +50,22 @@ export function SettingsView() {
       return null
   }
 
-  const handleResetWorkspace = () => {
-    resetFileSystem();
-    resetTerminals();
+  const handleResetWorkspace = async () => {
     setResetAlertOpen(false);
-    toast.success("Workspace has been reset.");
-    setTimeout(() => window.location.reload(), 500);
+    const resetPromise = Promise.all([
+      resetFileSystem(),
+      resetTerminals(),
+      resetEditor()
+    ]);
+    
+    toast.promise(resetPromise, {
+        loading: 'Resetting workspace...',
+        success: () => {
+            router.replace('/editor');
+            return 'Workspace has been reset.';
+        },
+        error: 'Failed to reset workspace.'
+    });
   }
 
   return (

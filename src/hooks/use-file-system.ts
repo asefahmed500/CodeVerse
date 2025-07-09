@@ -4,10 +4,8 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
 import { toast } from 'sonner';
-import { v4 as uuidv4 } from 'uuid';
 import type { FileType, SearchResult, SearchMatch } from '@/types';
 import { getLanguageConfigFromFilename } from '@/config/languages';
-import { useCallback } from 'react';
 
 const buildFileTree = (files: FileType[]): FileType[] => {
     const fileMap = new Map<string, FileType>();
@@ -63,7 +61,7 @@ interface FileSystemState {
   replaceInFiles: (query: string, replaceWith: string) => Promise<void>;
   setWorkspaceFromGitHub: (owner: string, repo: string) => Promise<{ firstFileId: string | null } | void>;
   commitChanges: () => void;
-  reset: () => void;
+  reset: () => Promise<void>;
 }
 
 const useFileSystemStore = create<FileSystemState>((set, get) => ({
@@ -133,15 +131,15 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             toast.error("Failed to create file.");
             return null;
         }
-
+        
         const createdFile: FileType = await res.json();
         
-        // Re-fetch all files to guarantee state consistency and prevent race conditions
-        await get().fetchFiles();
+        set(produce((state: FileSystemState) => {
+          state.allFiles.push(createdFile);
+          state.files = buildFileTree(state.allFiles);
+        }));
         
-        // Now that state is synced, set the new file as active
         get().setActiveFileId(createdFile._id);
-
         toast.success(`File "${createdFile.name}" created.`);
         return get().findFile(createdFile._id);
     },
@@ -165,17 +163,13 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
         const newFolder: FileType = await res.json();
         
-        // Re-fetch all files to guarantee state consistency
-        await get().fetchFiles();
-
-        // Ensure the parent folder is expanded
-        if (parentId) {
-            set(produce((state: FileSystemState) => {
-                if (!state.expandedFolders.includes(parentId!)) {
-                    state.expandedFolders.push(parentId!);
-                }
-            }));
-        }
+        set(produce((state: FileSystemState) => {
+            state.allFiles.push({ ...newFolder, children: [] });
+            state.files = buildFileTree(state.allFiles);
+            if (parentId && !state.expandedFolders.includes(parentId!)) {
+                state.expandedFolders.push(parentId!);
+            }
+        }));
 
         toast.success(`Folder "${newFolder.name}" created.`);
         return get().findFile(newFolder._id);
@@ -199,6 +193,16 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             updates.language = getLanguageConfigFromFilename(updates.name).monacoLanguage;
         }
 
+        set(produce((state: FileSystemState) => {
+            const file = state.allFiles.find(f => f._id === fileId);
+            if (file) {
+                Object.assign(file, updates);
+            }
+            if(nameChanged) {
+                state.files = buildFileTree(state.allFiles);
+            }
+        }));
+
         const res = await fetch(`/api/files?fileId=${fileId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -210,19 +214,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             get().fetchFiles(); // Re-sync with server on failure
             return;
         }
-
-        const updatedFile = await res.json();
-        set(produce((state: FileSystemState) => {
-            const fileIndex = state.allFiles.findIndex(f => f._id === fileId);
-            if(fileIndex !== -1) {
-              state.allFiles[fileIndex] = { ...state.allFiles[fileIndex], ...updatedFile };
-            }
-            if(nameChanged) {
-                state.files = buildFileTree(state.allFiles);
-            }
-        }));
-
+        
         if (!('content' in updates)) {
+          const updatedFile = await res.json();
           toast.success(`Saved ${updatedFile.name}.`);
         }
     },
@@ -234,20 +228,37 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         let nextActiveFileId: string | null = get().activeFileId;
         const wasActive = get().activeFileId === fileId;
 
-        if (wasActive) {
-            const openFiles = get().allFiles.filter(f => !f.isFolder && f.isOpen && f._id !== fileId);
-            openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-            nextActiveFileId = openFiles[0]?._id ?? null;
-        }
-
         const res = await fetch(`/api/files?fileId=${fileId}`, { method: 'DELETE' });
         if (!res.ok) {
             toast.error("Failed to delete item.");
             return { nextActiveFileId: get().activeFileId };
         }
         
-        await get().fetchFiles(); // Re-fetch to get the new state from server
+        const idsToDelete = [fileId];
+        if (fileToDelete.isFolder) {
+            const findDescendants = (id: string, allFiles: FileType[]) => {
+                const children = allFiles.filter(f => f.parentId === id);
+                for (const child of children) {
+                    idsToDelete.push(child._id);
+                    if (child.isFolder) {
+                        findDescendants(child._id, allFiles);
+                    }
+                }
+            };
+            findDescendants(fileId, get().allFiles);
+        }
+        
+        set(produce((state: FileSystemState) => {
+            state.allFiles = state.allFiles.filter(f => !idsToDelete.includes(f._id));
+            state.files = buildFileTree(state.allFiles);
+        }));
 
+        if (wasActive) {
+            const openFiles = get().allFiles.filter(f => !f.isFolder && f.isOpen);
+            openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            nextActiveFileId = openFiles[0]?._id ?? null;
+        }
+        
         toast.success(`Deleted ${fileToDelete.name}.`);
         return { nextActiveFileId };
     },
@@ -255,7 +266,8 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
     duplicateFileOrFolder: async (fileId: string) => {
         const originalNode = get().findFile(fileId);
         if (!originalNode) return;
-        
+
+        toast.loading("Duplicating...");
         const res = await fetch('/api/files?action=duplicate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -267,33 +279,13 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             return;
         }
 
-        const duplicatedFile = await res.json();
-        
-        const siblingNames = get().allFiles
-            .filter(f => f.parentId === originalNode.parentId)
-            .map(f => f.name);
-            
-        let newName = originalNode.name;
-        const extIndex = newName.lastIndexOf('.');
-        const baseName = extIndex !== -1 ? newName.substring(0, extIndex) : newName;
-        const extension = extIndex !== -1 ? newName.substring(extIndex) : '';
-        
-        let counter = 1;
-        do {
-            newName = `${baseName} copy${counter > 1 ? ` ${counter}` : ''}${extension}`;
-            counter++;
-        } while (siblingNames.includes(newName));
-
-        await get().updateFile(duplicatedFile._id, { name: newName });
         await get().fetchFiles();
-
         toast.success(`Duplicated "${originalNode.name}"`);
     },
 
     setActiveFileId: (fileId) => {
         set(produce((state: FileSystemState) => {
             if (state.activeFileId === fileId) {
-                // If already active, just ensure its open state is correct if it's a file
                 const newActive = fileId ? state.allFiles.find(f => f._id === fileId) : null;
                 if (newActive && !newActive.isFolder) newActive.isOpen = true;
                 return;
@@ -423,16 +415,15 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
     },
       
     reset: async () => {
+        set({ loading: true });
         const res = await fetch('/api/files?action=resetAll', { method: 'DELETE' });
         if (!res.ok) {
             toast.error("Failed to reset workspace.");
+            set({ loading: false });
             return;
         }
-        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [], dirtyFileIds: [] });
-        toast.success("Workspace has been reset.");
+        set({ files: [], allFiles: [], activeFileId: null, expandedFolders: [], dirtyFileIds: [], loading: false });
     }
 }));
 
 export const useFileSystem = useFileSystemStore;
-
-    
