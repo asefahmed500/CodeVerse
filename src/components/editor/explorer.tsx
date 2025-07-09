@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil, Folder, Search } from "lucide-react";
@@ -17,7 +18,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -164,11 +164,9 @@ function FileTree({
     const fileMap = new Map(allFiles.map(f => [f._id, f]));
     const matchingIds = new Set<string>();
 
-    // Find all files that match the search term
     for (const file of allFiles) {
       if (file.name.toLowerCase().includes(lowerCaseSearch)) {
         matchingIds.add(file._id);
-        // Add all parents to ensure the path is visible
         let currentParentId = file.parentId;
         while(currentParentId) {
             matchingIds.add(currentParentId);
@@ -241,6 +239,7 @@ function FileTreeItem({
   const { activeFileId, setActiveFileId, toggleFolder, expandedFolders, deleteFile, updateFile, duplicateFileOrFolder } = useFileSystem();
   const [isEditing, setIsEditing] = useState(false);
   const [editingValue, setEditingValue] = useState(file.name);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const isExpanded = expandedFolders.includes(file._id);
 
@@ -259,8 +258,7 @@ function FileTreeItem({
     e.preventDefault();
     e.stopPropagation();
     setActiveFileId(file._id);
-    const trigger = e.currentTarget.querySelector('[data-context-menu-trigger="true"]');
-    if (trigger instanceof HTMLElement) trigger.click();
+    setIsMenuOpen(true);
   }
 
   const handleRename = async () => {
@@ -278,25 +276,19 @@ function FileTreeItem({
     setEditingValue(file.name);
   }
 
-  const handleDuplicate = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDuplicate = async () => {
     await duplicateFileOrFolder(file._id);
   }
   
-  const handleNewFile = (e: Event) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleNewFile = () => {
     onStartCreation('file', file._id);
   }
   
-  const handleNewFolder = (e: Event) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleNewFolder = () => {
     onStartCreation('folder', file._id);
   }
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async () => {
     const wasActive = activeFileId === file._id;
     const { nextActiveFileId } = await deleteFile(file._id);
     
@@ -309,52 +301,48 @@ function FileTreeItem({
     }
   };
 
-  const handleRenameClick = (e: Event) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleRenameClick = () => {
     setIsEditing(true);
   }
   
   return (
-    <div>
-    <DropdownMenu>
+    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <DropdownMenuTrigger asChild>
-          <div data-context-menu-trigger="true" className="w-full"></div>
+        <div
+            className={cn(`flex items-center py-1 px-2 rounded cursor-pointer group`, activeFileId === file._id && "bg-accent text-accent-foreground")}
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+            onClick={handleItemClick}
+            onContextMenu={handleContextMenu}
+          >
+            {file.isFolder ? (
+              <ChevronRight size={16} className={`mr-1 transition-transform transform ${isExpanded ? 'rotate-90' : ''}`} />
+            ) : <div className="w-4 mr-1" />}
+            
+            {isEditing ? (
+              <div className="flex items-center w-full">
+                <FileIcon filename={editingValue} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
+                <Input 
+                    type="text"
+                    value={editingValue}
+                    onChange={(e) => setEditingValue(e.target.value)}
+                    onBlur={handleRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRename();
+                      if (e.key === 'Escape') handleCancelRename();
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                    className="h-6 text-sm bg-background border-primary"
+                />
+              </div>
+            ) : (
+              <>
+                <FileIcon filename={file.name} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
+                <span className="truncate text-sm">{file.name}</span>
+              </>
+            )}
+          </div>
       </DropdownMenuTrigger>
-      <div
-          className={cn(`flex items-center py-1 px-2 rounded cursor-pointer group`, activeFileId === file._id && "bg-accent text-accent-foreground")}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
-          onClick={handleItemClick}
-          onContextMenu={handleContextMenu}
-        >
-          {file.isFolder ? (
-            <ChevronRight size={16} className={`mr-1 transition-transform transform ${isExpanded ? 'rotate-90' : ''}`} />
-          ) : <div className="w-4 mr-1" />}
-          
-          {isEditing ? (
-             <div className="flex items-center w-full">
-              <FileIcon filename={editingValue} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
-              <Input 
-                  type="text"
-                  value={editingValue}
-                  onChange={(e) => setEditingValue(e.target.value)}
-                  onBlur={handleRename}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleRename();
-                    if (e.key === 'Escape') handleCancelRename();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  autoFocus
-                  className="h-6 text-sm bg-background border-primary"
-              />
-            </div>
-          ) : (
-             <>
-              <FileIcon filename={file.name} isFolder={file.isFolder} isExpanded={isExpanded} className="mr-2" />
-              <span className="truncate text-sm">{file.name}</span>
-            </>
-          )}
-        </div>
       <DropdownMenuContent className="w-48" align="start" onContextMenu={(e) => e.preventDefault()}>
           {file.isFolder && (
             <>
@@ -373,17 +361,16 @@ function FileTreeItem({
             <Pencil className="mr-2 h-4 w-4" />
             <span>Rename</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={(e) => handleDuplicate(e as any)}>
+          <DropdownMenuItem onSelect={handleDuplicate}>
             <Copy className="mr-2 h-4 w-4" />
             <span>Duplicate</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => handleDelete(e as any)}>
+          <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={handleDelete}>
             <X className="mr-2 h-4 w-4" />
             <span>Delete</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
   );
 }
