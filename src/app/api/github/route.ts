@@ -78,7 +78,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Missing owner or repo" }, { status: 400 });
         }
         const items = await fetchRepoContents(octokit, owner, repo);
-        return NextResponse.json(items);
+        const mappedItems = items.map(item => ({
+            path: item.path,
+            content: item.content,
+            isFolder: item.type === 'dir'
+        }));
+        return NextResponse.json(mappedItems);
 
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });

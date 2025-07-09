@@ -398,7 +398,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const toastId = toast.loading(`Cloning ${owner}/${repo}...`);
         try {
             const res = await fetch(`/api/github?action=getRepoTree&owner=${owner}&repo=${repo}`);
-            const ghItems: { path: string; content?: string; type: 'file' | 'dir' }[] = await res.json();
+            const ghItems: { path: string; content?: string; isFolder: boolean }[] = await res.json();
 
             if (!res.ok) throw new Error((ghItems as any).error || "Failed to clone repository.");
             if (ghItems.length === 0) {
@@ -410,9 +410,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const itemsToCreate = ghItems.map(item => ({
                 path: item.path,
                 name: item.path.split('/').pop()!,
-                content: item.type === 'file' ? item.content || '' : '',
-                isFolder: item.type === 'dir',
-                language: item.type === 'file' ? getLanguageConfigFromFilename(item.path).monacoLanguage : 'plaintext',
+                content: !item.isFolder ? item.content || '' : '',
+                isFolder: item.isFolder,
+                language: !item.isFolder ? getLanguageConfigFromFilename(item.path).monacoLanguage : 'plaintext',
             }));
 
             const bulkRes = await fetch('/api/files?action=bulkCreate', {

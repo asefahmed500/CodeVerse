@@ -9,7 +9,7 @@ import { useTheme } from "next-themes";
 import { debounce } from "@/lib/utils";
 import { useTerminalStore } from "@/hooks/use-terminal-store";
 import { executeCode } from "@/lib/code-runner";
-import { getLanguageConfigFromFilename } from "@/config/languages";
+import { LANGUAGE_CONFIG, getLanguageConfigFromFilename } from "@/config/languages";
 import { useFileSystem } from "@/hooks/use-file-system";
 
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
@@ -51,6 +51,13 @@ const findNodeByPath = (allFiles: FileType[], path: string): FileType | null => 
     return currentNode;
 };
 
+// Create a set of runner commands from the language config for efficient lookup
+const runnerCommands = new Set(
+    Object.values(LANGUAGE_CONFIG)
+        .map(lang => lang.runner)
+        .filter((runner): runner is string => !!runner)
+);
+
 
 export function Terminal({
   terminal,
@@ -87,8 +94,40 @@ export function Terminal({
         debouncedUpdate({ commands: newHistory });
     }
 
+    const runFile = async () => {
+        const pathArg = args[0];
+        if (!pathArg) {
+            term.writeln(`\r\n${cmd}: missing file path`);
+            return;
+        }
+        const fullPath = pathArg.startsWith('/') ? pathArg : `${currentPath === '/' ? '' : currentPath}/${pathArg}`;
+        const fileToRun = findNodeByPath(allFiles, fullPath);
+        const langConfig = fileToRun ? getLanguageConfigFromFilename(fileToRun.name) : null;
+        
+        if (fileToRun && !fileToRun.isFolder && langConfig && langConfig.judge0Id) {
+            term.writeln(`\r\n\x1b[33mExecuting ${fileToRun.name} with ${langConfig.name} runtime...\x1b[0m`);
+            const { logs, error } = await executeCode(fileToRun.content, langConfig.judge0Id);
+            term.writeln('');
+            if (logs.length > 0) {
+                term.writeln('\r\x1b[1;32mOutput:\x1b[0m');
+                logs.forEach(log => term.writeln(`\r${log}`));
+            }
+            if (error) {
+                term.writeln(`\r\x1b[1;31mError: ${error}\x1b[0m`);
+            }
+        } else {
+            term.writeln(`\r\n${cmd}: cannot execute '${pathArg}'. Not a valid or runnable file.`);
+        }
+    }
+
+    if(runnerCommands.has(cmd)) {
+        await runFile();
+        return;
+    }
+
     switch (cmd) {
         case 'help':
+            const runners = Array.from(runnerCommands).join(', ');
             term.writeln('\r\nAvailable commands:');
             term.writeln('  ls              - List directory contents');
             term.writeln('  cd [dir]        - Change directory');
@@ -98,16 +137,7 @@ export function Terminal({
             term.writeln('  clear           - Clear the terminal screen');
             term.writeln('  help            - Show this help message');
             term.writeln('\r\nExecution commands:');
-            term.writeln('  node [file]     - Execute a JS/TS file');
-            term.writeln('  python [file]   - Execute a Python file');
-            term.writeln('  run-java [file] - Compile and run a Java file');
-            term.writeln('  run-c [file]    - Compile and run a C file');
-            term.writeln('  run-cpp [file]  - Compile and run a C++ file');
-            term.writeln('  run-csharp [file]- Compile and run a C# file');
-            term.writeln('  run-go [file]   - Compile and run a Go file');
-            term.writeln('  run-php [file]  - Execute a PHP file');
-            term.writeln('  run-ruby [file] - Execute a Ruby file');
-            term.writeln('  run-rust [file] - Compile and run a Rust file');
+            term.writeln(`  ${runners} [file]`);
             break;
         case 'ls':
             const children = getChildrenOfPath(allFiles, currentPath);
@@ -159,40 +189,6 @@ export function Terminal({
             break;
         case 'clear':
             term.clear();
-            break;
-        case 'node':
-        case 'python':
-        case 'run-java':
-        case 'run-c':
-        case 'run-cpp':
-        case 'run-csharp':
-        case 'run-go':
-        case 'run-php':
-        case 'run-ruby':
-        case 'run-rust':
-            const pathArg = args[0];
-            if (!pathArg) {
-                term.writeln(`\r\n${cmd}: missing file path`);
-                break;
-            }
-            const fullPath = pathArg.startsWith('/') ? pathArg : `${currentPath === '/' ? '' : currentPath}/${pathArg}`;
-            const fileToRun = findNodeByPath(allFiles, fullPath);
-            const langConfig = fileToRun ? getLanguageConfigFromFilename(fileToRun.name) : null;
-            
-            if (fileToRun && !fileToRun.isFolder && langConfig && langConfig.judge0Id) {
-                term.writeln(`\r\n\x1b[33mExecuting ${fileToRun.name} with ${langConfig.name} runtime...\x1b[0m`);
-                const { logs, error } = await executeCode(fileToRun.content, langConfig.judge0Id);
-                term.writeln('');
-                if (logs.length > 0) {
-                    term.writeln('\r\x1b[1;32mOutput:\x1b[0m');
-                    logs.forEach(log => term.writeln(`\r${log}`));
-                }
-                if (error) {
-                    term.writeln(`\r\x1b[1;31mError: ${error}\x1b[0m`);
-                }
-            } else {
-                term.writeln(`\r\n${cmd}: cannot execute '${pathArg}'. Not a valid or runnable file.`);
-            }
             break;
         case '':
             break;
