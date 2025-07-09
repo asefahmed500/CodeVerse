@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -22,20 +23,31 @@ export function Panel() {
 
   const isTerminalActive = activeView === "terminal";
 
-  // This effect syncs the panel's visual state to the active view.
-  // If the terminal view is activated elsewhere (e.g. shortcut, menu), the panel opens.
-  // If the view is changed away from terminal, the panel closes.
+  // This effect now implements a simple, unidirectional data flow.
+  // The panel's collapsed state is driven directly by whether the 'terminal' view is active.
   useEffect(() => {
+    // If the terminal should be active but the panel is collapsed, open it.
     if (isTerminalActive && isCollapsed) {
       setCollapsed(false);
-    } else if (!isTerminalActive && !isCollapsed) {
+    }
+    // If the terminal is not the active view and the panel is open, close it.
+    else if (!isTerminalActive && !isCollapsed) {
       setCollapsed(true);
     }
   }, [isTerminalActive, isCollapsed, setCollapsed]);
 
-  const togglePanelVisibility = () => {
-    setActiveView(isTerminalActive ? null : "terminal");
+  // This handler now controls the active view state, which in turn controls the panel's visibility.
+  const handleTogglePanel = () => {
+    if (isTerminalActive) {
+      setActiveView(null); // If terminal is active, clicking the control should close it.
+    } else {
+      setActiveView("terminal"); // Otherwise, make the terminal the active view.
+    }
   };
+  
+  const handleClosePanel = () => {
+    setActiveView(null);
+  }
 
   return (
     <div
@@ -46,13 +58,18 @@ export function Panel() {
       <Tabs
         value={isTerminalActive ? "terminal" : ""}
         className="flex flex-col h-full bg-card"
+        onValueChange={(value) => {
+            if (value === 'terminal') {
+                setActiveView('terminal');
+            }
+        }}
       >
         <div className="flex items-center justify-between h-8 flex-shrink-0">
           <TabsList className="bg-transparent h-8 p-0">
             <TabsTrigger
               value="terminal"
               className="h-full text-xs rounded-none border-t-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3"
-              onClick={togglePanelVisibility}
+              onClick={handleTogglePanel}
             >
               TERMINAL
             </TabsTrigger>
@@ -63,7 +80,7 @@ export function Panel() {
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-foreground hover:bg-accent"
-              onClick={togglePanelVisibility}
+              onClick={handleTogglePanel}
             >
               {isCollapsed ? (
                 <ChevronUp className="h-4 w-4" />
@@ -75,7 +92,7 @@ export function Panel() {
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-foreground hover:bg-accent"
-              onClick={() => setActiveView(null)}
+              onClick={handleClosePanel}
             >
               <X className="h-4 w-4" />
             </Button>
