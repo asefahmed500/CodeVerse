@@ -37,7 +37,7 @@ The process is designed to be safe, reliable, and persistent across devices.
 - **Syntax Highlighting:** Automatically detects the language based on the file extension and applies appropriate color schemes.
 - **Keybindings:** Supports standard keybindings and Vim mode. You can switch between them in the Settings panel.
 - **Breakpoints:** Click in the gutter to the left of the line numbers to set or remove a breakpoint (red dot). These are used by the debugger.
-- **Snippets:** Common boilerplate code can be inserted using snippets. For example, in a JavaScript file, type \`clg\` and press Tab or Enter to expand it to \`console.log();\`.
+- **Snippets:** Common boilerplate code can be inserted using snippets for all major programming languages. For example, in a JavaScript file, type 'clg' and press Tab to expand it to 'console.log();', or in a Python file, type 'def' to create a new function.
 
 ---
 
