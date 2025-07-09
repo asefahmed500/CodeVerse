@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Cloud, CodeXml, GitFork } from "lucide-react";
 import dynamic from 'next/dynamic';
+import { useState, useEffect } from "react";
 
 const HeroAnimation = dynamic(
   () => import('@/components/hero-animation').then((mod) => mod.HeroAnimation),
@@ -16,6 +17,12 @@ const HeroAnimation = dynamic(
 
 
 export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground overflow-x-hidden">
       <main className="flex-1">
@@ -55,7 +62,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="w-full h-[400px] lg:h-[500px] flex items-center justify-center -mt-10 lg:-mt-20">
-                <HeroAnimation />
+                {isMounted ? <HeroAnimation /> : <div className="h-[400px] w-full" />}
               </div>
             </div>
           </div>
