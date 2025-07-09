@@ -30,3 +30,9 @@ export interface SearchResult {
   file: FileType;
   matches: SearchMatch[];
 }
+
+export interface Problem {
+  fileId: string;
+  message: string;
+  lineNumber?: number;
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { GitBranch, Check, ShieldAlert, X, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { GitBranch, Check, X, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { getLanguageFromFilename } from '@/config/languages'
 import { useEditorStore } from '@/hooks/use-editor-store'
@@ -12,6 +12,7 @@ import {
   } from "@/components/ui/tooltip"
 import { Button } from '../ui/button'
 import React, { useEffect, useState } from 'react'
+import { useProblemsStore } from '@/hooks/use-problems-store'
   
 const StatusBarItem = ({ children, tooltip, className }: { children: React.ReactNode, tooltip: string, className?: string }) => (
     <Tooltip>
@@ -29,6 +30,7 @@ const StatusBarItem = ({ children, tooltip, className }: { children: React.React
 export function StatusBar() {
   const { activeFile, activeFileId, dirtyFileIds, savingFileIds, lastSavedFileId, lastSavedTime } = useFileSystem()
   const { cursorPosition } = useEditorStore()
+  const { problems } = useProblemsStore();
   const [showSaved, setShowSaved] = useState(false);
 
   useEffect(() => {
@@ -62,10 +64,17 @@ export function StatusBar() {
     <TooltipProvider>
     <div className="flex items-center justify-between h-6 px-2 text-xs bg-muted/50 text-muted-foreground border-t flex-shrink-0">
       <div className="flex items-center h-full">
-        <Button variant="destructive" size="sm" className="h-full rounded-none px-2 flex items-center gap-1 text-white">
-          <X size={14}/>
-          <span>2 Issues</span>
-        </Button>
+         {problems.length > 0 ? (
+          <Button variant="destructive" size="sm" className="h-full rounded-none px-2 flex items-center gap-1 text-white">
+            <X size={14}/>
+            <span>{problems.length} {problems.length === 1 ? 'Issue' : 'Issues'}</span>
+          </Button>
+        ) : (
+           <StatusBarItem tooltip="No problems detected">
+              <Check size={14} />
+              <span className='hidden sm:inline'>No Issues</span>
+          </StatusBarItem>
+        )}
         <StatusBarItem tooltip="Source Control (main branch)">
             <GitBranch className="h-4 w-4" />
             <span>main</span>

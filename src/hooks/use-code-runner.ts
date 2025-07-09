@@ -5,6 +5,8 @@ import { getLanguageConfigFromFilename } from '@/config/languages';
 import { toast } from 'sonner';
 import { executeCode } from '@/lib/code-runner';
 import { useTerminalManager } from './use-terminal-manager-store';
+import { useProblemsStore } from './use-problems-store';
+import type { Problem } from '@/types';
 
 export function useCodeRunner() {
   const { activeFile } = useFileSystem();
@@ -18,9 +20,11 @@ export function useCodeRunner() {
         return;
     }
     
+    const { setProblems, clearProblems } = useProblemsStore.getState();
+    clearProblems();
+    
     const languageConfig = getLanguageConfigFromFilename(activeFile.name);
 
-    // Special case for HTML files: open in a new tab for live preview
     if (languageConfig.monacoLanguage === 'html') {
         try {
             const blob = new Blob([activeFile.content], { type: 'text/html' });
@@ -38,7 +42,6 @@ export function useCodeRunner() {
         return;
     }
 
-    // Ensure terminal is visible and active
     if(terminals.length > 0) setActiveTerminalId(terminals[0]._id);
     openView('terminal');
     
@@ -47,11 +50,28 @@ export function useCodeRunner() {
     const result = await executeCode(activeFile.content, languageConfig.judge0Id);
     
     const outputLines = [];
+    const newProblems: Problem[] = [];
     outputLines.push(`\r\n\x1b[1;34m> Executing ${activeFile.name}...\x1b[0m`);
+
+    const processAndAddProblem = (message: string) => {
+        const errorRegex = /(?:[a-zA-Z]:\\)?(?:[a-zA-Z0-9\s_.-]+\/)*[a-zA-Z0-9_.-]+:(\d+):(?:\d+:\s)?(.*)/;
+        const match = message.match(errorRegex);
+        if (match) {
+            newProblems.push({
+                fileId: activeFile._id,
+                lineNumber: parseInt(match[1], 10),
+                message: match[2].trim(),
+            });
+        } else {
+             newProblems.push({ fileId: activeFile._id, message });
+        }
+    }
 
     if (result.compileError) {
         outputLines.push(`\r\n\x1b[1;31mCompilation Error:\x1b[0m`);
-        outputLines.push(...result.compileError.split('\n').map(l => `\r\x1b[31m${l}\x1b[0m`));
+        const compileErrors = result.compileError.split('\n');
+        outputLines.push(...compileErrors.map(l => `\r\x1b[31m${l}\x1b[0m`));
+        compileErrors.forEach(processAndAddProblem);
     }
     
     if (result.logs.length > 0) {
@@ -62,6 +82,7 @@ export function useCodeRunner() {
     if (result.errorLogs.length > 0) {
         outputLines.push(`\r\n\x1b[1;31mError Output (stderr):\x1b[0m`);
         outputLines.push(...result.errorLogs.map(l => `\r\x1b[31m${l}\x1b[0m`));
+        result.errorLogs.forEach(processAndAddProblem);
     }
 
     if (result.executionError) {
@@ -74,6 +95,11 @@ export function useCodeRunner() {
     } else {
         toast.success(`Executed ${activeFile.name} successfully.`, { id: toastId });
         outputLines.push(`\r\n\x1b[32mExecution finished successfully.\x1b[0m`);
+    }
+    
+    setProblems(newProblems);
+    if (newProblems.length > 0) {
+        openView('problems');
     }
 
     appendOutput(outputLines.join(''));

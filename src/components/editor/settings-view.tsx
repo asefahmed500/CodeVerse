@@ -26,11 +26,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useEditorStore } from '@/hooks/use-editor-store'
 import { useRouter } from 'next/navigation'
+import JSZip from 'jszip'
+import { saveAs } from 'file-saver'
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme()
   const { activeView } = useActiveView()
-  const { reset: resetFileSystem } = useFileSystem()
+  const { reset: resetFileSystem, allFiles, getPathForFile } = useFileSystem()
   const { reset: resetTerminals } = useTerminalManager()
   const { reset: resetEditor } = useEditorStore();
   const router = useRouter();
@@ -67,6 +69,29 @@ export function SettingsView() {
         error: 'Failed to reset workspace.'
     });
   }
+  
+  const handleExportWorkspace = async () => {
+    const zip = new JSZip();
+    const toastId = toast.loading("Zipping workspace...");
+
+    try {
+        allFiles.forEach(file => {
+            if (!file.isFolder) {
+                const path = getPathForFile(file._id);
+                // Remove the leading slash for correct zip structure
+                zip.file(path.substring(1), file.content);
+            }
+        });
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        saveAs(content, 'CodeVerse-Workspace.zip');
+        toast.success("Workspace exported successfully.", { id: toastId });
+    } catch (error) {
+        console.error("Failed to export workspace:", error);
+        toast.error("Failed to export workspace.", { id: toastId });
+    }
+  }
+
 
   return (
     <div className="h-full flex flex-col bg-card text-card-foreground">
@@ -181,6 +206,13 @@ export function SettingsView() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+            </div>
+            <div className='flex items-center justify-between'>
+                <div className='flex flex-col space-y-1'>
+                    <Label htmlFor="export-workspace" className='text-sm'>Export Workspace</Label>
+                    <p className='text-xs text-muted-foreground'>Download all your files and folders as a ZIP archive.</p>
+                </div>
+                <Button id="export-workspace" variant="outline" onClick={handleExportWorkspace}>Export to .zip</Button>
             </div>
         </div>
       </div>

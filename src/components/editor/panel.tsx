@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { ExplainView } from "./explain-view";
 import { FixView } from "./fix-view";
+import { useProblemsStore } from "@/hooks/use-problems-store";
+import { useActiveView } from "@/hooks/use-active-view";
 
 const TerminalManager = dynamic(
   () => import("./terminal-manager").then((mod) => mod.TerminalManager),
@@ -17,30 +19,35 @@ const TerminalManager = dynamic(
   }
 );
 
+const ProblemsView = dynamic(
+  () => import('./problems-view').then(mod => mod.ProblemsView),
+  { ssr: false }
+);
+
+
 export function Panel() {
-  const [activeTab, setActiveTab] = useState<string | null>("terminal");
-  const [isCollapsed, setCollapsed] = useState(false);
+  const { problems } = useProblemsStore();
+  const { activeView: activePanel, openView, toggleActiveView } = useActiveView();
+  
+  const isPanelVisible = ['problems', 'terminal', 'fix', 'explain'].includes(activePanel || '');
 
   const handleTabChange = (value: string) => {
-    if (isCollapsed) {
-      setCollapsed(false);
-      setActiveTab(value);
-    } else if (activeTab === value) {
-      setCollapsed(true);
-    } else {
-      setActiveTab(value);
-    }
+    openView(value as any);
   };
 
   const handleTogglePanel = () => {
-    setCollapsed(!isCollapsed);
+    if (isPanelVisible) {
+        // If a panel is open, close it by setting view to explorer (or null)
+        openView('explorer');
+    } else {
+        // If it's collapsed, open the terminal by default
+        openView('terminal');
+    }
   };
   
   const handleClosePanel = () => {
-    setCollapsed(true);
+    openView('explorer'); // A safe default view to "close" the panel
   }
-
-  const isPanelVisible = !isCollapsed;
 
   return (
     <div
@@ -49,7 +56,7 @@ export function Panel() {
       }`}
     >
       <Tabs
-        value={isPanelVisible ? activeTab || "" : ""}
+        value={isPanelVisible ? activePanel || "" : ""}
         className="flex flex-col h-full"
         onValueChange={handleTabChange}
       >
@@ -60,6 +67,11 @@ export function Panel() {
               className="h-full text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3 flex items-center gap-2"
             >
               <MessageSquareWarning className="h-4 w-4" /> Problems
+              {problems.length > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center text-xs font-semibold h-5 w-5 rounded-full bg-destructive text-destructive-foreground">
+                  {problems.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger
               value="terminal"
@@ -107,8 +119,8 @@ export function Panel() {
 
         {isPanelVisible && (
           <div className="flex-1 bg-background overflow-hidden">
-            <TabsContent value="problems" className="h-full mt-0 p-4 text-sm text-muted-foreground">
-              No problems have been detected.
+            <TabsContent value="problems" className="h-full mt-0">
+                <ProblemsView />
             </TabsContent>
             <TabsContent value="terminal" className="h-full mt-0">
               <TerminalManager />
