@@ -10,7 +10,7 @@ import { KeyboardShortcuts } from "@/components/editor/keyboard-shortcuts";
 import { CommandPalette } from "@/components/editor/command-palette";
 import { useEffect } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -27,11 +27,12 @@ export default function EditorLayout({
 }) {
   const { isCollapsed, setCollapsed } = useSidebarStore();
   const { fetchFiles, loading } = useFileSystem();
+  const router = useRouter();
   
   const { status } = useSession({
     required: true,
     onUnauthenticated() {
-      redirect('/signin');
+      router.replace('/signin');
     },
   });
 

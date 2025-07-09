@@ -8,64 +8,94 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowRight, Code, Terminal, GitBranch, Zap, Cloud, ShieldCheck, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const features = [
+  {
+    icon: <Code className="h-8 w-8 text-primary" />,
+    title: "Full-Fledged Editor",
+    description: "A complete code editor experience with syntax highlighting, powered by Monaco.",
+  },
+  {
+    icon: <Terminal className="h-8 w-8 text-primary" />,
+    title: "Integrated Terminal",
+    description: "Execute commands and run code in a familiar terminal interface.",
+  },
+  {
+    icon: <GitBranch className="h-8 w-8 text-primary" />,
+    title: "Source Control",
+    description: "Clone from GitHub and manage your projects with built-in version control.",
+  },
+  {
+    icon: <Zap className="h-8 w-8 text-primary" />,
+    title: "Code Execution",
+    description: "Run JavaScript, Python, C++, and more in a secure sandboxed environment.",
+  },
+  {
+      icon: <Cloud className="h-8 w-8 text-primary" />,
+      title: "Cloud Workspace",
+      description: "Your files are saved to your account, accessible from anywhere.",
+  },
+  {
+    icon: <ShieldCheck className="h-8 w-8 text-primary" />,
+    title: "Secure & Reliable",
+    description: "Your work is always saved and protected with a resilient cloud backend.",
+  },
+];
+
+const testimonials = [
+  {
+    name: "Alex Rivera",
+    title: "Senior Developer, Tech Innovators",
+    avatar: "https://placehold.co/100x100.png",
+    dataAiHint: "man portrait",
+    quote: "CodeVerse has completely transformed my workflow. The ability to have a full-featured IDE in the browser, synced across all my devices, is a game-changer for productivity."
+  },
+  {
+    name: "Samantha Chen",
+    title: "Founder, Creative Coders",
+    avatar: "https://placehold.co/100x100.png",
+    dataAiHint: "woman portrait",
+    quote: "As a startup founder, I need tools that are fast, reliable, and require zero setup. CodeVerse delivers on all fronts. I was able to onboard my entire team in minutes."
+  },
+  {
+    name: "David Lee",
+    title: "Freelance Web Developer",
+    avatar: "https://placehold.co/100x100.png",
+    dataAiHint: "man glasses",
+    quote: "The integrated terminal and multi-language support are phenomenal. I can switch between a Node.js backend and a Python script without ever leaving my browser. Highly recommended!"
+  },
+];
+
+const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) => (
+    <div className="flex flex-col items-start text-left p-6 rounded-lg bg-card border border-border/50 hover:border-primary/50 hover:bg-card transition-all transform hover:-translate-y-1">
+        <div className="mb-4 p-3 bg-primary/10 rounded-lg">{icon}</div>
+        <h3 className="text-xl font-headline mb-2">{title}</h3>
+        <p className="text-muted-foreground">{description}</p>
+    </div>
+);
+
+const TestimonialCard = ({ name, title, avatar, dataAiHint, quote }: { name: string; title: string; avatar: string; dataAiHint: string; quote: string; }) => (
+    <Card className="bg-card/50 p-6 flex flex-col justify-between">
+        <div>
+            <div className="flex text-yellow-400 mb-4">
+                {[...Array(5)].map((_, i) => <Star key={i} className="w-5 h-5 fill-current" />)}
+            </div>
+            <p className="text-muted-foreground mb-6">"{quote}"</p>
+        </div>
+        <div className="flex items-center">
+            <Avatar className="h-12 w-12 mr-4">
+                <AvatarImage src={avatar} alt={name} data-ai-hint={dataAiHint} />
+                <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div>
+                <p className="font-semibold">{name}</p>
+                <p className="text-sm text-muted-foreground">{title}</p>
+            </div>
+        </div>
+    </Card>
+);
+
+
 export default function Home() {
-  const features = [
-    {
-      icon: <Code className="h-8 w-8 text-primary" />,
-      title: "Full-Fledged Editor",
-      description: "A complete code editor experience with syntax highlighting, powered by Monaco.",
-    },
-    {
-      icon: <Terminal className="h-8 w-8 text-primary" />,
-      title: "Integrated Terminal",
-      description: "Execute commands and run code in a familiar terminal interface.",
-    },
-    {
-      icon: <GitBranch className="h-8 w-8 text-primary" />,
-      title: "Source Control",
-      description: "Clone from GitHub and manage your projects with built-in version control.",
-    },
-    {
-      icon: <Zap className="h-8 w-8 text-primary" />,
-      title: "Code Execution",
-      description: "Run JavaScript, Python, C++, and more in a secure sandboxed environment.",
-    },
-    {
-        icon: <Cloud className="h-8 w-8 text-primary" />,
-        title: "Cloud Workspace",
-        description: "Your files are saved to your account, accessible from anywhere.",
-    },
-    {
-      icon: <ShieldCheck className="h-8 w-8 text-primary" />,
-      title: "Secure & Reliable",
-      description: "Your work is always saved and protected with a resilient cloud backend.",
-    },
-  ];
-
-  const testimonials = [
-    {
-      name: "Alex Rivera",
-      title: "Senior Developer, Tech Innovators",
-      avatar: "https://placehold.co/100x100.png",
-      dataAiHint: "man portrait",
-      quote: "CodeVerse has completely transformed my workflow. The ability to have a full-featured IDE in the browser, synced across all my devices, is a game-changer for productivity."
-    },
-    {
-      name: "Samantha Chen",
-      title: "Founder, Creative Coders",
-      avatar: "https://placehold.co/100x100.png",
-      dataAiHint: "woman portrait",
-      quote: "As a startup founder, I need tools that are fast, reliable, and require zero setup. CodeVerse delivers on all fronts. I was able to onboard my entire team in minutes."
-    },
-    {
-      name: "David Lee",
-      title: "Freelance Web Developer",
-      avatar: "https://placehold.co/100x100.png",
-      dataAiHint: "man glasses",
-      quote: "The integrated terminal and multi-language support are phenomenal. I can switch between a Node.js backend and a Python script without ever leaving my browser. Highly recommended!"
-    },
-  ]
-
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-sm">
@@ -139,11 +169,7 @@ export default function Home() {
                 </div>
                 <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                     {features.map((feature, index) => (
-                        <div key={index} className="flex flex-col items-start text-left p-6 rounded-lg bg-card border border-border/50 hover:border-primary/50 hover:bg-card transition-all transform hover:-translate-y-1">
-                            <div className="mb-4 p-3 bg-primary/10 rounded-lg">{feature.icon}</div>
-                            <h3 className="text-xl font-headline mb-2">{feature.title}</h3>
-                            <p className="text-muted-foreground">{feature.description}</p>
-                        </div>
+                        <FeatureCard key={index} {...feature} />
                     ))}
                 </div>
             </div>
@@ -159,24 +185,7 @@ export default function Home() {
             </div>
             <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-3">
               {testimonials.map((testimonial, index) => (
-                <Card key={index} className="bg-card/50 p-6 flex flex-col justify-between">
-                  <div>
-                    <div className="flex text-yellow-400 mb-4">
-                      {[...Array(5)].map((_, i) => <Star key={i} className="w-5 h-5 fill-current" />)}
-                    </div>
-                    <p className="text-muted-foreground mb-6">"{testimonial.quote}"</p>
-                  </div>
-                  <div className="flex items-center">
-                    <Avatar className="h-12 w-12 mr-4">
-                      <AvatarImage src={testimonial.avatar} alt={testimonial.name} data-ai-hint={testimonial.dataAiHint} />
-                      <AvatarFallback>{testimonial.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold">{testimonial.name}</p>
-                      <p className="text-sm text-muted-foreground">{testimonial.title}</p>
-                    </div>
-                  </div>
-                </Card>
+                <TestimonialCard key={index} {...testimonial} />
               ))}
             </div>
           </div>
