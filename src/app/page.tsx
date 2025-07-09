@@ -4,16 +4,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Cloud, CodeXml, GitFork } from "lucide-react";
-import dynamic from 'next/dynamic';
 import { useState, useEffect } from "react";
-
-const HeroAnimation = dynamic(
-  () => import('@/components/hero-animation').then((mod) => mod.HeroAnimation),
-  { 
-    ssr: false,
-    loading: () => <div className="h-[400px] w-full" />
-  }
-);
+import { HeroAnimation } from "@/components/hero-animation";
 
 
 export default function Home() {

@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -34,6 +35,14 @@ const nextConfig: NextConfig = {
       'utf-8-validate': 'commonjs utf-8-validate',
       bufferutil: 'commonjs bufferutil',
     });
+
+    // Force a single instance of React to prevent issues with multiple renderers.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      react: path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom'),
+    };
+    
     return config;
   },
 };
