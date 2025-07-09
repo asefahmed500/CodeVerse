@@ -21,17 +21,13 @@ export default function EditorFilePage() {
   const router = useRouter();
   const fileId = params?.fileId as string;
 
+  // Use the global state as the primary source of truth
   const { findFile, setActiveFileId, loading: fsLoading, fetchFiles } = useFileSystem();
   
-  const [fileState, setFileState] = useState<{
-    loading: boolean;
-    file: FileType | null;
-    error: string | null;
-  }>({
-    loading: true,
-    file: null,
-    error: null,
-  });
+  const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading');
+
+  // The file to render, read directly from the global store
+  const file = findFile(fileId);
 
   useEffect(() => {
     if (!fileId) {
@@ -42,54 +38,37 @@ export default function EditorFilePage() {
     let isMounted = true;
 
     const loadFile = async () => {
-      // Don't start fetching until the main file system is loaded from the initial fetch
+      // If the main file system is still performing its initial load, wait for it.
       if (fsLoading) {
+        setStatus('loading');
         return;
       }
 
-      setFileState({ loading: true, file: null, error: null });
-
-      // Fast path: check local state first
-      const localFile = findFile(fileId);
-      if (localFile) {
-        if (localFile.isFolder) {
-            router.replace('/editor');
-        } else {
-            setFileState({ loading: false, file: localFile, error: null });
-        }
+      // Fast path: If the file already exists in our global store, we're good to go.
+      if (findFile(fileId)) {
+        setStatus('success');
         return;
       }
       
-      // Fallback: fetch from API, as the local state might not be synced yet (e.g., hard refresh)
+      // Fallback path: If not in the store (e.g., hard refresh), fetch it from the API.
+      setStatus('loading');
       try {
         const res = await fetch(`/api/files/${fileId}`);
         if (!isMounted) return;
 
         if (!res.ok) {
-          if (res.status === 404) {
-            throw new Error("File not found. It may have been deleted.");
-          }
-          throw new Error("Failed to load the file from the server.");
+          throw new Error("File not found or could not be loaded.");
         }
         
-        const data: FileType = await res.json();
-        
-        // If we successfully fetch a file from the API, it means our local state is out of sync.
-        // The most robust way to handle this is to re-fetch the entire file tree.
-        // This ensures the new file and its potential siblings/parents are all correctly loaded.
+        // We found a file, but our global store is out of sync.
+        // Re-fetching the entire tree is the most reliable way to update the state.
         await fetchFiles();
-
-        if (data.isFolder) {
-            router.replace('/editor');
-        } else {
-            // After re-fetching, the file will be in the local state.
-            // We set it here just to trigger the re-render.
-            setFileState({ loading: false, file: data, error: null });
-        }
+        // After re-fetching, the next render will pick up the file from the store.
+        setStatus('success');
       } catch (err: any) {
         if (isMounted) {
           toast.error(err.message);
-          setFileState({ loading: false, file: null, error: err.message });
+          setStatus('error');
           router.replace('/editor');
         }
       }
@@ -103,27 +82,28 @@ export default function EditorFilePage() {
   }, [fileId, fsLoading, findFile, router, fetchFiles]);
   
   useEffect(() => {
-      if (fileState.file) {
-          setActiveFileId(fileState.file._id);
+      if (file) {
+          setActiveFileId(file._id);
+          if (file.isFolder) {
+            router.replace('/editor');
+          }
       }
-  }, [fileState.file, setActiveFileId]);
+  }, [file, setActiveFileId, router]);
 
-  if (fileState.loading) {
+
+  // Render logic is now based on the unified status and file existence from the global store
+  if (status === 'loading' || fsLoading || !file) {
     return <LoadingSpinner />;
   }
   
-  if (fileState.error) {
+  if (status === 'error') {
     return (
         <div className="flex items-center justify-center h-full bg-background">
-            <p className="text-lg text-destructive">{fileState.error}</p>
+            <p className="text-lg text-destructive">Could not load the specified file.</p>
         </div>
     );
   }
 
-  if (!fileState.file) {
-    // This case can happen briefly before redirect. A spinner is a good safeguard.
-    return <LoadingSpinner />;
-  }
-
-  return <Editor initialFile={fileState.file} />;
+  // At this point, we are certain that `file` is a valid FileType object and not a folder.
+  return <Editor initialFile={file} />;
 }

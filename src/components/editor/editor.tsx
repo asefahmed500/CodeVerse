@@ -19,10 +19,14 @@ import type * as monaco from 'monaco-editor';
 
 export function Editor({ initialFile }: { initialFile: FileType }) {
   const { theme } = useTheme();
-  // We use the initialFile prop to seed the state, but then rely on the zustand store for updates.
   const { findFile, updateFile, updateFileContentLocally, setActiveFileId } = useFileSystem();
+
+  // Defensive guard to prevent crash if an invalid prop is ever passed.
+  if (!initialFile) {
+    return null;
+  }
   
-  // The file from the store is the most up-to-date version
+  // The file from the store is the most up-to-date version, ensuring UI reflects local changes.
   const file = findFile(initialFile._id) || initialFile;
 
   const { setEditor, setSaveHandler, setCursorPosition, breakpoints, toggleBreakpoint, editor } = useEditorStore();
