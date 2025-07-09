@@ -308,12 +308,23 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 throw new Error(data.error || "Failed to duplicate item.");
             }
             
-            // The API now returns the duplicated structure
             const duplicatedItem: FileType = await res.json();
             const itemsToAdd: FileType[] = [duplicatedItem];
+            
             if (duplicatedItem.isFolder && duplicatedItem.children) {
-                const flatChildren = getFlatFiles(duplicatedItem.children);
-                itemsToAdd.push(...flatChildren);
+                 const flattenChildren = (node: FileType): FileType[] => {
+                    let flat: FileType[] = [];
+                    if (node.children) {
+                        node.children.forEach(child => {
+                            flat.push(child);
+                            if (child.isFolder) {
+                                flat = flat.concat(flattenChildren(child));
+                            }
+                        });
+                    }
+                    return flat;
+                };
+                itemsToAdd.push(...flattenChildren(duplicatedItem));
             }
             
             set(produce((state: FileSystemState) => {
