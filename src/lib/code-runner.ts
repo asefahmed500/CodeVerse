@@ -1,7 +1,16 @@
+
+export interface ExecutionResult {
+    logs: string[];
+    errorLogs: string[];
+    compileError: string | null;
+    executionError: string | null;
+    hasError: boolean;
+}
+
 export const executeCode = async (
     code: string, 
     languageId: number
-): Promise<{ logs: string[]; error: string | null }> => {
+): Promise<ExecutionResult> => {
     try {
         const response = await fetch("/api/run", {
             method: "POST",
@@ -14,29 +23,37 @@ export const executeCode = async (
 
         if (!response.ok) {
             const errorData = await response.json();
-            return { logs: [], error: errorData.error || `Request failed with status ${response.status}` };
+            return { 
+                logs: [], 
+                errorLogs: [],
+                compileError: null,
+                executionError: errorData.error || `Request failed with status ${response.status}`,
+                hasError: true
+            };
         }
 
         const result = await response.json();
         
-        let logs: string[] = [];
-        let error: string | null = null;
+        const logs = result.stdout ? result.stdout.split('\n').filter((l: string) => l.trim() !== '') : [];
+        const errorLogs = result.stderr ? result.stderr.split('\n').filter((l: string) => l.trim() !== '') : [];
+        const compileError = result.compile_output?.trim() || null;
         
-        if (result.stdout) {
-            logs = result.stdout.split('\n').filter((l: string) => l.trim() !== '');
+        let executionError = null;
+        if (result.status?.description && result.status.description !== 'Accepted') {
+            executionError = result.status.description;
         }
+        
+        const hasError = errorLogs.length > 0 || !!compileError || !!executionError;
 
-        if (result.stderr) {
-            error = result.stderr;
-        } else if (result.compile_output) {
-            error = result.compile_output;
-        } else if (result.status.description !== 'Accepted') {
-            error = result.status.description;
-        }
-
-        return { logs, error };
+        return { logs, errorLogs, compileError, executionError, hasError };
 
     } catch (e: any) {
-        return { logs: [], error: `An unexpected network error occurred: ${e.message}` };
+        return { 
+            logs: [], 
+            errorLogs: [],
+            compileError: null,
+            executionError: `An unexpected network error occurred: ${e.message}`,
+            hasError: true
+        };
     }
 };

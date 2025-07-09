@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useRef, useCallback, useState } from "react";
@@ -106,14 +107,28 @@ export function Terminal({
         
         if (fileToRun && !fileToRun.isFolder && langConfig && langConfig.judge0Id) {
             term.writeln(`\r\n\x1b[33mExecuting ${fileToRun.name} with ${langConfig.name} runtime...\x1b[0m`);
-            const { logs, error } = await executeCode(fileToRun.content, langConfig.judge0Id);
-            term.writeln('');
-            if (logs.length > 0) {
-                term.writeln('\r\x1b[1;32mOutput:\x1b[0m');
-                logs.forEach(log => term.writeln(`\r${log}`));
+            const result = await executeCode(fileToRun.content, langConfig.judge0Id);
+            
+            term.writeln(''); // new line
+
+            if (result.logs.length > 0) {
+                result.logs.forEach(log => term.writeln(`\r${log}`));
             }
-            if (error) {
-                term.writeln(`\r\x1b[1;31mError: ${error}\x1b[0m`);
+            if (result.errorLogs.length > 0) {
+                result.errorLogs.forEach(log => term.writeln(`\r\x1b[1;31m${log}\x1b[0m`));
+            }
+             if (result.compileError) {
+                 term.writeln(`\r\x1b[1;31mCompilation Error:\x1b[0m`);
+                 result.compileError.split('\n').forEach(line => term.writeln(`\r\x1b[1;31m  ${line}\x1b[0m`));
+            }
+            if (result.executionError) {
+                 term.writeln(`\r\x1b[1;31mExecution Error: ${result.executionError}\x1b[0m`);
+            }
+
+            if(result.hasError) {
+                 term.writeln(`\r\n\x1b[33mExecution finished with errors.\x1b[0m`);
+            } else {
+                 term.writeln(`\r\n\x1b[32mExecution finished successfully.\x1b[0m`);
             }
         } else {
             term.writeln(`\r\n${cmd}: cannot execute '${pathArg}'. Not a valid or runnable file.`);
@@ -122,6 +137,7 @@ export function Terminal({
 
     if(runnerCommands.has(cmd)) {
         await runFile();
+        term.write(prompt(currentPath));
         return;
     }
 
@@ -196,6 +212,7 @@ export function Terminal({
             term.writeln(`\r\nCommand not found: ${cmd}. Type 'help' for a list of commands.`);
             break;
     }
+    term.write(prompt(currentPath));
   }, [commandHistory, currentPath, debouncedUpdate, allFiles]);
 
 
@@ -213,49 +230,44 @@ export function Terminal({
     xterm.current.loadAddon(fitAddon.current);
     xterm.current.open(terminalRef.current);
     
-    xterm.current.onData(e => {
+    xterm.current.onKey(({ key, domEvent: e }) => {
         if (!xterm.current) return;
         
-        switch (e) {
-            case '\r': // Enter
-                executeCommand(currentLine);
-                setCurrentLine('');
+        if (e.key === 'Enter') {
+            executeCommand(currentLine);
+            setCurrentLine('');
+            setHistoryIndex(-1);
+        } else if (e.key === 'Backspace') {
+            if (currentLine.length > 0) {
+                xterm.current.write('\b \b');
+                setCurrentLine(currentLine.slice(0, -1));
+            }
+        } else if (e.key === 'ArrowUp') {
+            if (historyIndex < commandHistory.length - 1) {
+                const newIndex = historyIndex + 1;
+                setHistoryIndex(newIndex);
+                const cmd = commandHistory[newIndex];
+                xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                setCurrentLine(cmd);
+            }
+        } else if (e.key === 'ArrowDown') {
+             if (historyIndex > 0) {
+                const newIndex = historyIndex - 1;
+                setHistoryIndex(newIndex);
+                const cmd = commandHistory[newIndex];
+                xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                setCurrentLine(cmd);
+            } else {
                 setHistoryIndex(-1);
-                xterm.current.write(prompt(currentPath));
-                break;
-            case '\u007F': // Backspace
-                if (currentLine.length > 0) {
-                    xterm.current.write('\b \b');
-                    setCurrentLine(currentLine.slice(0, -1));
-                }
-                break;
-            case '\u001b[A': // Up arrow
-                if (historyIndex < commandHistory.length - 1) {
-                    const newIndex = historyIndex + 1;
-                    setHistoryIndex(newIndex);
-                    const cmd = commandHistory[newIndex];
-                    xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
-                    setCurrentLine(cmd);
-                }
-                break;
-            case '\u001b[B': // Down arrow
-                if (historyIndex > 0) {
-                    const newIndex = historyIndex - 1;
-                    setHistoryIndex(newIndex);
-                    const cmd = commandHistory[newIndex];
-                    xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
-                    setCurrentLine(cmd);
-                } else {
-                    setHistoryIndex(-1);
-                    xterm.current.write('\x1b[2K\r' + prompt(currentPath));
-                    setCurrentLine('');
-                }
-                break;
-            default:
-                if (e >= String.fromCharCode(0x20) && e <= String.fromCharCode(0x7e)) {
-                    setCurrentLine(currentLine + e);
-                    xterm.current.write(e);
-                }
+                xterm.current.write('\x1b[2K\r' + prompt(currentPath));
+                setCurrentLine('');
+            }
+        }
+        else if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+             if (key >= String.fromCharCode(0x20) && key <= String.fromCharCode(0x7e) || key.length > 1) {
+                setCurrentLine(currentLine + key);
+                xterm.current.write(key);
+            }
         }
     });
 
@@ -293,13 +305,9 @@ export function Terminal({
   
   useEffect(() => {
     if (commandToRun && xterm.current) {
-      xterm.current.writeln(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun}\x1b[0m`);
+      xterm.current.write(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun}\x1b[0m`);
       executeCommand(commandToRun);
       commandProcessed();
-      setTimeout(() => {
-        xterm.current?.write(prompt(currentPath));
-        xterm.current?.focus();
-      }, 100);
     }
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
   
