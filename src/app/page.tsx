@@ -40,30 +40,6 @@ const features = [
   },
 ];
 
-const testimonials = [
-  {
-    name: "Alex Rivera",
-    title: "Senior Developer, Tech Innovators",
-    avatar: "https://placehold.co/100x100.png",
-    dataAiHint: "man portrait",
-    quote: "CodeVerse has completely transformed my workflow. The ability to have a full-featured IDE in the browser, synced across all my devices, is a game-changer for productivity."
-  },
-  {
-    name: "Samantha Chen",
-    title: "Founder, Creative Coders",
-    avatar: "https://placehold.co/100x100.png",
-    dataAiHint: "woman portrait",
-    quote: "As a startup founder, I need tools that are fast, reliable, and require zero setup. CodeVerse delivers on all fronts. I was able to onboard my entire team in minutes."
-  },
-  {
-    name: "David Lee",
-    title: "Freelance Web Developer",
-    avatar: "https://placehold.co/100x100.png",
-    dataAiHint: "man glasses",
-    quote: "The integrated terminal and multi-language support are phenomenal. I can switch between a Node.js backend and a Python script without ever leaving my browser. Highly recommended!"
-  },
-];
-
 const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) => (
     <div className="flex flex-col items-start text-left p-6 rounded-lg bg-card border border-border/50 hover:border-primary/50 hover:bg-card transition-all transform hover:-translate-y-1">
         <div className="mb-4 p-3 bg-primary/10 rounded-lg">{icon}</div>
@@ -71,28 +47,6 @@ const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode, titl
         <p className="text-muted-foreground">{description}</p>
     </div>
 );
-
-const TestimonialCard = ({ name, title, avatar, dataAiHint, quote }: { name: string; title: string; avatar: string; dataAiHint: string; quote: string; }) => (
-    <Card className="bg-card/50 p-6 flex flex-col justify-between">
-        <div>
-            <div className="flex text-yellow-400 mb-4">
-                {[...Array(5)].map((_, i) => <Star key={i} className="w-5 h-5 fill-current" />)}
-            </div>
-            <p className="text-muted-foreground mb-6">"{quote}"</p>
-        </div>
-        <div className="flex items-center">
-            <Avatar className="h-12 w-12 mr-4">
-                <AvatarImage src={avatar} alt={name} data-ai-hint={dataAiHint} />
-                <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div>
-                <p className="font-semibold">{name}</p>
-                <p className="text-sm text-muted-foreground">{title}</p>
-            </div>
-        </div>
-    </Card>
-);
-
 
 export default function Home() {
   const year = new Date().getFullYear();
@@ -138,10 +92,15 @@ export default function Home() {
                            Get Started - It's Free
                            <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                         </Link>
-                        <Link href="https://github.com" target="_blank" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "flex items-center gap-2")}>
+                        <a
+                          href="https://github.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(buttonVariants({ size: "lg", variant: "outline" }), "flex items-center gap-2")}
+                        >
                            View on GitHub
                            <GitBranch className="h-5 w-5" />
-                        </Link>
+                        </a>
                     </div>
                 </div>
                 <div className="relative mt-12 md:mt-16 max-w-5xl mx-auto">
@@ -174,22 +133,6 @@ export default function Home() {
                     ))}
                 </div>
             </div>
-        </section>
-
-        <section className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="text-center space-y-4 mb-12">
-              <h2 className="text-3xl font-bold font-headline tracking-tighter sm:text-4xl md:text-5xl">Loved by Developers Worldwide</h2>
-              <p className="max-w-3xl mx-auto text-muted-foreground md:text-xl">
-                Don't just take our word for it. Here's what our users are saying.
-              </p>
-            </div>
-            <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-3">
-              {testimonials.map((testimonial, index) => (
-                <TestimonialCard key={index} {...testimonial} />
-              ))}
-            </div>
-          </div>
         </section>
 
         <section className="w-full py-12 md:py-24 lg:py-32 bg-card/50 border-t border-border">
