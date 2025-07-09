@@ -36,11 +36,10 @@ export default function EditorFilePage() {
         updateFile(fileId, { isOpen: true, isActive: true });
       }
       setActiveFileId(fileId);
-    } else {
-      // If the file doesn't exist after hydration, it's an invalid URL.
-      // The layout's hydration guard ensures findFile is reliable here.
-      router.replace('/editor');
     }
+    // If the file is not found, we don't redirect. We let the component show a loading
+    // spinner, and a subsequent re-render (after the file system store updates)
+    // will provide the file. This prevents a race condition on file creation.
   }, [fileId, fileToRender, router, setActiveFileId, updateFile]);
 
 

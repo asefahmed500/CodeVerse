@@ -1,6 +1,6 @@
 "use client";
 
-import { Bug, Play, StepOver, SkipForward, Power } from "lucide-react";
+import { Bug, Play, SkipForward, Power } from "lucide-react";
 import { useActiveView } from "@/hooks/use-active-view";
 import { useDebugStore } from "@/hooks/use-debug-store";
 import { useFileSystem } from "@/hooks/use-file-system";
@@ -48,7 +48,7 @@ export function DebugView() {
               <Play className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon" onClick={step} disabled={!isPaused} title="Step Over (F10)">
-              <StepOver className="h-5 w-5" />
+              <SkipForward className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon" onClick={stop} title="Stop (Shift+F5)">
               <Power className="h-5 w-5 text-destructive" />

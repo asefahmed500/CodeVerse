@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { X, ChevronRight, ReplaceAll } from 'lucide-react'
-import { useDebounceCallback } from 'use-debounce'
+import { useDebouncedCallback } from 'use-debounce'
 import { useRouter } from 'next/navigation'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { toast } from 'sonner'
@@ -55,7 +55,7 @@ export function SearchView() {
   const { searchFiles, replaceInFiles } = useFileSystem()
   const { activeView } = useActiveView();
 
-  const debouncedSearch = useDebounceCallback(async (searchQuery: string) => {
+  const debouncedSearch = useDebouncedCallback(async (searchQuery: string) => {
     const searchResults = await searchFiles(searchQuery);
     setResults(searchResults);
   }, 500);
