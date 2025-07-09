@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from 'zustand';
@@ -135,15 +136,11 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
         const createdFile: FileType = await res.json();
         
-        set(produce((state: FileSystemState) => {
-            const newAllFiles = [...state.allFiles, createdFile];
-            state.allFiles = newAllFiles;
-            state.files = buildFileTree(newAllFiles);
-            
-            if (parentId && !state.expandedFolders.includes(parentId)) {
-                state.expandedFolders.push(parentId);
-            }
-        }));
+        // Re-fetch all files to guarantee state consistency and prevent race conditions
+        await get().fetchFiles();
+        
+        // Now that state is synced, set the new file as active
+        get().setActiveFileId(createdFile._id);
 
         toast.success(`File "${createdFile.name}" created.`);
         return get().findFile(createdFile._id);
@@ -168,14 +165,17 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
         const newFolder: FileType = await res.json();
         
-        set(produce((state: FileSystemState) => {
-            const newAllFiles = [...state.allFiles, newFolder];
-            state.allFiles = newAllFiles;
-            state.files = buildFileTree(newAllFiles);
-            if (parentId && !state.expandedFolders.includes(parentId)) {
-                state.expandedFolders.push(parentId);
-            }
-        }));
+        // Re-fetch all files to guarantee state consistency
+        await get().fetchFiles();
+
+        // Ensure the parent folder is expanded
+        if (parentId) {
+            set(produce((state: FileSystemState) => {
+                if (!state.expandedFolders.includes(parentId!)) {
+                    state.expandedFolders.push(parentId!);
+                }
+            }));
+        }
 
         toast.success(`Folder "${newFolder.name}" created.`);
         return get().findFile(newFolder._id);
@@ -434,3 +434,5 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 }));
 
 export const useFileSystem = useFileSystemStore;
+
+    
