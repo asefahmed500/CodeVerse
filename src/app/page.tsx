@@ -90,26 +90,18 @@ export default function Home() {
                            Get Started - It's Free
                            <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                         </Link>
-                        <a
-                          href="https://github.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={cn(buttonVariants({ size: "lg", variant: "outline" }), "flex items-center gap-2")}
-                        >
-                           View on GitHub
-                           <GitBranch className="h-5 w-5" />
-                        </a>
                     </div>
                 </div>
                 <div className="relative mt-12 md:mt-16 max-w-5xl mx-auto">
                     <div className="relative rounded-xl shadow-2xl shadow-primary/20">
                       <Image 
-                        src="https://placehold.co/1200x800.png"
+                        src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&h=800&fit=crop"
                         width={1200}
                         height={800}
-                        alt="CodeVerse IDE Interface"
+                        alt="A professional code editor interface with dark theme and highlighted syntax"
                         data-ai-hint="dark ide"
                         className="rounded-xl border-2 border-primary/20"
+                        priority
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent"></div>
                     </div>
@@ -175,3 +167,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
