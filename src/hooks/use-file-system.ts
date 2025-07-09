@@ -52,6 +52,9 @@ interface FileSystemState {
   expandedFolders: string[];
   loading: boolean;
   dirtyFileIds: string[];
+  savingFileIds: string[];
+  lastSavedFileId: string | null;
+  lastSavedTime: number | null;
   
   fetchFiles: () => Promise<void>;
   findFile: (fileId: string) => FileType | null;
@@ -78,6 +81,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
     expandedFolders: [],
     loading: true,
     dirtyFileIds: [],
+    savingFileIds: [],
+    lastSavedFileId: null,
+    lastSavedTime: null,
 
     fetchFiles: async () => {
         set({ loading: true });
@@ -205,10 +211,17 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
     },
 
     updateFile: async (fileId, updates) => {
+        const isContentUpdate = 'content' in updates;
         const nameChanged = 'name' in updates;
         if (nameChanged && updates.name) {
             updates.language = getLanguageConfigFromFilename(updates.name).monacoLanguage;
         }
+        
+        set(produce((state: FileSystemState) => {
+            if (!state.savingFileIds.includes(fileId)) {
+                state.savingFileIds.push(fileId);
+            }
+        }));
         
         try {
             const res = await fetch(`/api/files?fileId=${fileId}`, {
@@ -232,16 +245,24 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 if(nameChanged) {
                     state.files = buildFileTree(state.allFiles);
                 }
+                if (isContentUpdate) {
+                    state.dirtyFileIds = state.dirtyFileIds.filter(id => id !== fileId);
+                    state.lastSavedFileId = fileId;
+                    state.lastSavedTime = Date.now();
+                }
             }));
             
-            if (!('content' in updates)) {
+            if (!isContentUpdate) {
               toast.success(`Saved ${updatedFile.name}.`);
             }
             return updatedFile;
         } catch(e: any) {
-            toast.error(e.message);
-            get().fetchFiles();
+            toast.error(`Failed to save ${get().findFile(fileId)?.name}: ${e.message}`);
             return null;
+        } finally {
+            set(produce((state: FileSystemState) => {
+                state.savingFileIds = state.savingFileIds.filter(id => id !== fileId);
+            }));
         }
     },
 

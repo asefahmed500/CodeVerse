@@ -49,9 +49,11 @@ export function Editor({ initialFile }: { initialFile: FileType }) {
     fileContentRef.current = file.content;
   }, [file.content]);
   
-  const immediateSave = useCallback((currentContent: string) => {
-    updateFile(file._id, { content: currentContent });
-    toast.success(`${file.name} saved.`);
+  const immediateSave = useCallback(async (currentContent: string) => {
+    const savedFile = await updateFile(file._id, { content: currentContent });
+    if(savedFile) {
+      toast.success(`${file.name} saved.`);
+    }
   }, [file._id, file.name, updateFile]);
   
   const debouncedSave = useCallback(debounce(() => {
