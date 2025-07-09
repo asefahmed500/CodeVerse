@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, ChevronUp, X, TerminalSquare, MessageSquareWarning, Sparkles, PencilRuler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
+import { ExplainView } from "./explain-view";
+import { FixView } from "./fix-view";
 
 const TerminalManager = dynamic(
   () => import("./terminal-manager").then((mod) => mod.TerminalManager),
@@ -111,11 +113,11 @@ export function Panel() {
             <TabsContent value="terminal" className="h-full mt-0">
               <TerminalManager />
             </TabsContent>
-             <TabsContent value="fix" className="h-full mt-0 p-4 text-sm text-muted-foreground">
-              AI-powered fix and refactor suggestions will appear here.
+             <TabsContent value="fix" className="h-full mt-0">
+              <FixView />
             </TabsContent>
-             <TabsContent value="explain" className="h-full mt-0 p-4 text-sm text-muted-foreground">
-              Code explanations from our AI assistant will appear here.
+             <TabsContent value="explain" className="h-full mt-0">
+              <ExplainView />
             </TabsContent>
           </div>
         )}
