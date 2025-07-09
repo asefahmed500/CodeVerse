@@ -3,10 +3,11 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowRight, Code, Terminal, GitBranch, Zap, Cloud, ShieldCheck, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const features = [
@@ -77,12 +78,12 @@ export default function Home() {
             <span className="font-bold text-lg">CodeVerse</span>
           </Link>
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" asChild>
-                <Link href="/signin">Sign In</Link>
-            </Button>
-            <Button asChild>
-                <Link href="/signup">Get Started</Link>
-            </Button>
+            <Link href="/signin" className={cn(buttonVariants({ variant: "ghost" }))}>
+              Sign In
+            </Link>
+            <Link href="/signup" className={cn(buttonVariants())}>
+              Get Started
+            </Link>
           </div>
         </div>
       </header>
@@ -103,18 +104,14 @@ export default function Home() {
                         CodeVerse is a blazingly fast, cloud-native development environment that works from anywhere, on any device. No setup required.
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Button size="lg" className="group" asChild>
-                           <Link href="/signup">
-                             Get Started - It's Free
-                             <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                           </Link>
-                         </Button>
-                         <Button size="lg" variant="outline" asChild>
-                            <Link href="https://github.com" target="_blank">
-                                View on GitHub
-                                <GitBranch className="ml-2 h-5 w-5" />
-                            </Link>
-                         </Button>
+                        <Link href="/signup" className={cn(buttonVariants({ size: "lg" }), "group")}>
+                           Get Started - It's Free
+                           <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                        </Link>
+                        <Link href="https://github.com" target="_blank" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "flex items-center gap-2")}>
+                           View on GitHub
+                           <GitBranch className="h-5 w-5" />
+                        </Link>
                     </div>
                 </div>
                 <div className="relative mt-12 md:mt-16 max-w-5xl mx-auto">
@@ -194,12 +191,10 @@ export default function Home() {
                         Create an account and get instant access to your personal cloud IDE. It's free to get started.
                     </p>
                     <div className="mt-6">
-                        <Button size="lg" className="group" asChild>
-                          <Link href="/signup">
+                        <Link href="/signup" className={cn(buttonVariants({ size: "lg" }), "group")}>
                             Sign Up Now
                             <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                          </Link>
-                        </Button>
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -218,10 +213,10 @@ export default function Home() {
               &copy; {new Date().getFullYear()} CodeVerse. All rights reserved.
             </p>
             <nav className="flex gap-4 sm:gap-6">
-              <Link href="#" className="text-sm hover:underline underline-offset-4 text-muted-foreground">
+              <Link href="/terms" className="text-sm hover:underline underline-offset-4 text-muted-foreground">
                 Terms of Service
               </Link>
-              <Link href="#" className="text-sm hover:underline underline-offset-4 text-muted-foreground">
+              <Link href="/privacy" className="text-sm hover:underline underline-offset-4 text-muted-foreground">
                 Privacy Policy
               </Link>
             </nav>
@@ -230,5 +225,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
