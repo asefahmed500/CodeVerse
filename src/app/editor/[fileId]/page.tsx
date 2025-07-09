@@ -23,92 +23,103 @@ export default function EditorFilePage() {
 
   const { findFile, setActiveFileId, loading: fsLoading } = useFileSystem();
   
-  // Use undefined to represent the "not yet determined" state
-  const [file, setFile] = useState<FileType | null | undefined>(() => fileId ? findFile(fileId) : undefined);
-  const [error, setError] = useState<string | null>(null);
+  // A single state to track the file loading process
+  const [fileState, setFileState] = useState<{
+    loading: boolean;
+    file: FileType | null;
+    error: string | null;
+  }>({
+    loading: true,
+    file: null,
+    error: null,
+  });
 
   useEffect(() => {
     if (!fileId) {
-        router.replace('/editor');
-        return;
+      router.replace('/editor');
+      return;
     }
 
     let isMounted = true;
-    
-    // First, try to find the file in the already-loaded file system state.
-    // This is the "fast path" for client-side navigation.
-    const localFile = findFile(fileId);
-    if (localFile) {
+
+    const loadFile = async () => {
+      // Don't start fetching until the main file system is loaded
+      if (fsLoading) {
+        return;
+      }
+
+      setFileState({ loading: true, file: null, error: null });
+
+      // Fast path: check local state first
+      const localFile = findFile(fileId);
+      if (localFile) {
         if (localFile.isFolder) {
             router.replace('/editor');
         } else {
-            setFile(localFile);
-            setActiveFileId(fileId);
+            setFileState({ loading: false, file: localFile, error: null });
         }
-        return; // Found it, no need to fetch
-    }
-    
-    // If not in local state (e.g., on a hard refresh or if state isn't synced yet),
-    // and the file system isn't loading, then fetch from the API.
-    const fetchFile = async () => {
-        try {
-            const res = await fetch(`/api/files/${fileId}`);
-            if (!res.ok) {
-                if (res.status === 404) {
-                    throw new Error("File not found. It may have been deleted.");
-                }
-                throw new Error("Failed to fetch file from server.");
-            }
-            const data: FileType = await res.json();
+        return;
+      }
+      
+      // Fallback: fetch from API
+      try {
+        const res = await fetch(`/api/files/${fileId}`);
+        if (!isMounted) return;
 
-            if (isMounted) {
-                if (data.isFolder) {
-                    router.replace('/editor');
-                } else {
-                    setFile(data);
-                    setActiveFileId(fileId);
-                }
-            }
-        } catch (err: any) {
-            if (isMounted) {
-                setError(err.message);
-                toast.error(err.message);
-                router.replace('/editor');
-            }
+        if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error("File not found. It may have been deleted.");
+          }
+          throw new Error("Failed to load the file from the server.");
         }
+        
+        const data: FileType = await res.json();
+
+        if (data.isFolder) {
+            router.replace('/editor');
+        } else {
+            setFileState({ loading: false, file: data, error: null });
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          toast.error(err.message);
+          setFileState({ loading: false, file: null, error: err.message });
+          router.replace('/editor');
+        }
+      }
     };
     
-    // Only fetch if the main file system has finished loading and we still haven't found the file.
-    if (!fsLoading) {
-        fetchFile();
-    }
+    loadFile();
 
     return () => {
       isMounted = false;
     };
-  }, [fileId, fsLoading, findFile, router, setActiveFileId]);
+  }, [fileId, fsLoading, findFile, router]);
+  
+  // Effect to set the globally active file ID once it's loaded
+  useEffect(() => {
+      if (fileState.file) {
+          setActiveFileId(fileState.file._id);
+      }
+  }, [fileState.file, setActiveFileId]);
 
-  // While file system is loading or we are fetching a file, show a spinner.
-  // The `file === undefined` check handles the initial state before we decide to fetch.
-  if (fsLoading || file === undefined) {
+  // Render based on state
+  if (fileState.loading) {
     return <LoadingSpinner />;
   }
   
-  // If an error occurred during fetch.
-  if (error) {
+  if (fileState.error) {
     return (
         <div className="flex items-center justify-center h-full bg-background">
-            <p className="text-lg text-destructive">{error}</p>
+            <p className="text-lg text-destructive">{fileState.error}</p>
         </div>
     );
   }
 
-  // If file is null after trying everything (e.g., 404 from API).
-  if (!file) {
-    // The useEffect hook should have already redirected, but this is a safeguard.
+  if (!fileState.file) {
+    // This case should be handled by the redirect in the effect, but it's a good safeguard.
     return <LoadingSpinner />;
   }
 
-  // We have a valid file, render the editor.
-  return <Editor initialFile={file} />;
+  return <Editor initialFile={fileState.file} />;
 }
