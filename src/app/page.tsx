@@ -108,7 +108,7 @@ export default function Home() {
                         width={1200}
                         height={800}
                         alt="CodeVerse IDE Interface"
-                        data-ai-hint="ide interface dark"
+                        data-ai-hint="dark ide"
                         className="rounded-xl border-2 border-primary/20"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent"></div>
