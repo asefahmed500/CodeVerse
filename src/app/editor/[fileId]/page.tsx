@@ -21,9 +21,8 @@ export default function EditorFilePage() {
   const router = useRouter();
   const fileId = params?.fileId as string;
 
-  const { findFile, setActiveFileId, loading: fsLoading } = useFileSystem();
+  const { findFile, setActiveFileId, loading: fsLoading, fetchFiles } = useFileSystem();
   
-  // A single state to track the file loading process
   const [fileState, setFileState] = useState<{
     loading: boolean;
     file: FileType | null;
@@ -43,7 +42,7 @@ export default function EditorFilePage() {
     let isMounted = true;
 
     const loadFile = async () => {
-      // Don't start fetching until the main file system is loaded
+      // Don't start fetching until the main file system is loaded from the initial fetch
       if (fsLoading) {
         return;
       }
@@ -61,7 +60,7 @@ export default function EditorFilePage() {
         return;
       }
       
-      // Fallback: fetch from API
+      // Fallback: fetch from API, as the local state might not be synced yet (e.g., hard refresh)
       try {
         const res = await fetch(`/api/files/${fileId}`);
         if (!isMounted) return;
@@ -74,10 +73,17 @@ export default function EditorFilePage() {
         }
         
         const data: FileType = await res.json();
+        
+        // If we successfully fetch a file from the API, it means our local state is out of sync.
+        // The most robust way to handle this is to re-fetch the entire file tree.
+        // This ensures the new file and its potential siblings/parents are all correctly loaded.
+        await fetchFiles();
 
         if (data.isFolder) {
             router.replace('/editor');
         } else {
+            // After re-fetching, the file will be in the local state.
+            // We set it here just to trigger the re-render.
             setFileState({ loading: false, file: data, error: null });
         }
       } catch (err: any) {
@@ -94,16 +100,14 @@ export default function EditorFilePage() {
     return () => {
       isMounted = false;
     };
-  }, [fileId, fsLoading, findFile, router]);
+  }, [fileId, fsLoading, findFile, router, fetchFiles]);
   
-  // Effect to set the globally active file ID once it's loaded
   useEffect(() => {
       if (fileState.file) {
           setActiveFileId(fileState.file._id);
       }
   }, [fileState.file, setActiveFileId]);
 
-  // Render based on state
   if (fileState.loading) {
     return <LoadingSpinner />;
   }
@@ -117,7 +121,7 @@ export default function EditorFilePage() {
   }
 
   if (!fileState.file) {
-    // This case should be handled by the redirect in the effect, but it's a good safeguard.
+    // This case can happen briefly before redirect. A spinner is a good safeguard.
     return <LoadingSpinner />;
   }
 

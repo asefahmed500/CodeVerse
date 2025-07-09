@@ -1,4 +1,3 @@
-
 "use client";
 
 import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil, Folder } from "lucide-react";
@@ -19,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
+import { ScrollArea } from "../ui/scroll-area";
 
 function CreationInput({
   type,
@@ -103,7 +103,6 @@ export function Explorer() {
       }
     } else if (type === 'folder') {
       await createFolder(name, parentId);
-      // No redirect for folders, explorer will update
     }
   };
 
@@ -165,7 +164,7 @@ function FileTree({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-1">
+    <ScrollArea className="flex-1 p-1">
       <Collapsible defaultOpen>
         <CollapsibleTrigger className="flex items-center p-1 font-bold text-sm uppercase w-full">
             <ChevronRight size={16} className="transform transition-transform duration-200 data-[state=open]:rotate-90"/>
@@ -183,7 +182,7 @@ function FileTree({
             )}
         </CollapsibleContent>
       </Collapsible>
-    </div>
+    </ScrollArea>
   );
 }
 
@@ -229,7 +228,6 @@ function FileTreeItem({
         return;
     }
     await updateFile(file._id, { name: editingValue });
-    toast.success(`Renamed to ${editingValue}`);
     setIsEditing(false);
   };
   
@@ -261,7 +259,6 @@ function FileTreeItem({
     const { nextActiveFileId } = await deleteFile(file._id);
     
     if (wasActive) {
-      setActiveFileId(nextActiveFileId);
       if (nextActiveFileId) {
         router.replace(`/editor/${nextActiveFileId}`);
       } else {
@@ -338,6 +335,7 @@ function FileTreeItem({
             <Copy className="mr-2 h-4 w-4" />
             <span>Duplicate</span>
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => handleDelete(e as any)}>
             <X className="mr-2 h-4 w-4" />
             <span>Delete</span>

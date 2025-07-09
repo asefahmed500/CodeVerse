@@ -10,23 +10,24 @@ const buildFileTree = (files: FileType[]): FileType[] => {
     const fileMap = new Map<string, FileType>();
     const roots: FileType[] = [];
 
-    // First, map all files and initialize children arrays
     files.forEach(file => {
         fileMap.set(file._id, { ...file, children: file.isFolder ? [] : undefined });
     });
 
-    // Then, populate the children arrays
     files.forEach(file => {
         if (file.parentId && fileMap.has(file.parentId)) {
             const parent = fileMap.get(file.parentId);
-            parent?.children?.push(fileMap.get(file._id)!);
+            // Ensure children array exists before pushing
+            if (parent && parent.children) {
+                 parent.children.push(fileMap.get(file._id)!);
+            }
         } else {
             roots.push(fileMap.get(file._id)!);
         }
     });
     
-    // Sort children alphabetically, folders first
     const sortChildren = (nodes: FileType[]) => {
+      if (!nodes) return;
       nodes.sort((a, b) => {
         if (a.isFolder && !b.isFolder) return -1;
         if (!a.isFolder && b.isFolder) return 1;
@@ -44,8 +45,8 @@ const buildFileTree = (files: FileType[]): FileType[] => {
 };
 
 interface FileSystemState {
-  files: FileType[]; // The tree structure
-  allFiles: FileType[]; // A flat list for easy lookups
+  files: FileType[];
+  allFiles: FileType[];
   activeFileId: string | null;
   expandedFolders: string[];
   loading: boolean;
@@ -238,7 +239,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             return updatedFile;
         } catch(e: any) {
             toast.error(e.message);
-            get().fetchFiles(); // Re-sync with server on failure
+            get().fetchFiles();
             return null;
         }
     },
@@ -247,8 +248,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const fileToDelete = get().findFile(fileId);
         if (!fileToDelete) return { nextActiveFileId: null };
 
-        let nextActiveFileId: string | null = get().activeFileId;
-
+        const toastId = toast.loading(`Deleting ${fileToDelete.name}...`);
         try {
             const res = await fetch(`/api/files?fileId=${fileId}`, { method: 'DELETE' });
             if (!res.ok) {
@@ -262,7 +262,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 state.allFiles = state.allFiles.filter(f => !deletedIds.includes(f._id));
                 state.files = buildFileTree(state.allFiles);
 
-                // If the deleted file or a containing folder was active, find a new active file
                 if (state.activeFileId && deletedIds.includes(state.activeFileId)) {
                     const openFiles = state.allFiles.filter(f => !f.isFolder && f.isOpen && !deletedIds.includes(f._id));
                     openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
@@ -270,11 +269,10 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 }
             }));
 
-            nextActiveFileId = get().activeFileId;
-            toast.success(`Deleted ${fileToDelete.name}.`);
-            return { nextActiveFileId };
+            toast.success(`Deleted ${fileToDelete.name}.`, { id: toastId });
+            return { nextActiveFileId: get().activeFileId };
         } catch(e: any) {
-            toast.error(e.message);
+            toast.error(e.message, { id: toastId });
             return { nextActiveFileId: get().activeFileId };
         }
     },
@@ -283,7 +281,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const originalNode = get().findFile(fileId);
         if (!originalNode) return;
 
-        const toastId = toast.loading("Duplicating...");
+        const toastId = toast.loading(`Duplicating ${originalNode.name}...`);
         try {
             const res = await fetch('/api/files?action=duplicate', {
                 method: 'POST',
@@ -296,12 +294,10 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 throw new Error(data.error || "Failed to duplicate item.");
             }
             
-            // The API now returns the full duplicated structure
             const duplicatedItem: FileType = await res.json();
             
-            // Helper to flatten the nested children from the API response
             const flattenChildren = (node: FileType): FileType[] => {
-                let flat: FileType[] = [{...node, children: undefined}]; // Add the folder itself
+                let flat: FileType[] = [{...node, children: undefined}];
                 if (node.children) {
                     node.children.forEach(child => {
                         flat.push(...flattenChildren(child));
@@ -439,7 +435,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const firstFileId = firstFile?._id ?? null;
             get().setActiveFileId(firstFileId);
             
-
             toast.success(`Cloned ${repo} successfully.`, { id: toastId });
             return { firstFileId };
         } catch (error: any) {
