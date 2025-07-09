@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -41,6 +42,8 @@ const ActivityBarItem = React.memo(function ActivityBarItem({
         </Tooltip>
     );
 });
+ActivityBarItem.displayName = 'ActivityBarItem';
+
 
 export function ActivityBar() {
   const { activeView, toggleActiveView } = useActiveView();
