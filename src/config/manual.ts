@@ -1,15 +1,33 @@
-export const IDE_MANUAL = `AETHERMIND IDE - FEATURE MANUAL
+export const IDE_MANUAL = `CODEVERSE IDE - FEATURE MANUAL
 ===============================
 
-This document explains the core features of the Aethermind IDE and how they work. It will be updated as new features are added.
+This document explains the core features of the CodeVerse IDE and how they work. It will be updated as new features are added.
 
 ---
 
 1. FILE SYSTEM & EXPLORER
 -------------------------
-- The file explorer on the left allows you to create, rename, and delete files and folders.
-- All your files are saved in your browser's local storage. This means your workspace is persistent on your machine, but not accessible from other devices.
-- To start fresh, you can use the "Reset Workspace" button in the Settings panel.
+This feature allows you to manage your project's structure directly in the browser.
+
+### Creating Files & Folders:
+- **Using Header Icons:** In the "Explorer" view, use the "New File" or "New Folder" icons at the top to create an item in the root of your workspace.
+- **Using Context Menu:** Right-click on a folder to create a new file or folder inside it.
+
+### Managing Files & Folders:
+It's all done by right-clicking on the file or folder you want to manage in the "Explorer" panel.
+
+- **Right-Click an Item:** A context menu will appear with several options.
+- **To Rename:** Select "Rename". The item's name will become an editable field. Type the new name and press Enter.
+- **To Delete:** Select "Delete". Your file and all its contents (if it's a folder) will be permanently removed from your account.
+- **To Duplicate:** Select "Duplicate". This will create a copy of the selected file or folder in the same directory.
+
+### How it Works (Under the Hood):
+The process is designed to be safe, reliable, and persistent across devices.
+
+1.  **UI Interaction:** You interact with the \`Explorer\` component. When you perform an action like creating or deleting a file, the UI calls a function in the central file system state manager.
+2.  **State Management & API Request:** The state manager (\`useFileSystem\` hook) immediately updates the UI for a responsive feel. Simultaneously, it sends a secure request to the backend API (e.g., a \`POST\` request to \`/api/files\` to create a file).
+3.  **Secure Backend & Database:** The Next.js API route receives the request. It validates the action and then performs the operation (create, update, delete) on the central MongoDB database. Your files are tied to your user account.
+4.  **Persistence Across Devices:** Because your workspace is stored in a central database, you can log in from any device and access your complete file system. To start fresh, you can use the "Reset Workspace" button in the Settings panel.
 
 ---
 
