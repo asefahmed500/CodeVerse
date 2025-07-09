@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo } from 'react'
-import { X } from 'lucide-react'
+import { X, SplitSquareHorizontal, BookText, Sparkles } from 'lucide-react'
 import { useFileSystem } from '@/hooks/use-file-system'
 import { useRouter } from 'next/navigation'
 import type { FileType } from '@/types'
 import { FileIcon } from './file-icon'
+import { Button } from '../ui/button'
 
 export function EditorTabs() {
   const { files, updateFile, activeFileId, setActiveFileId } = useFileSystem()
@@ -49,26 +50,39 @@ export function EditorTabs() {
     router.push(`/editor/${file._id}`);
   }
 
-  if (openFiles.length === 0) return <div className="h-[36px] bg-muted border-b border-background"></div>
+  if (openFiles.length === 0) return <div className="h-[40px] bg-card border-b"></div>
 
   return (
-    <div className="flex items-center bg-muted border-b border-background">
-      {openFiles.map((file) => (
-        <div
-          key={file._id}
-          className={`flex items-center px-3 h-[36px] text-sm border-r border-background cursor-pointer group ${activeFileId === file._id ? 'bg-background text-foreground' : 'bg-secondary text-muted-foreground hover:bg-background'}`}
-          onClick={() => handleTabClick(file)}
-        >
-          <FileIcon filename={file.name} className="h-4 w-4 mr-2" />
-          <span className="mr-2">{file.name}</span>
-          <button
-            className={`p-1 rounded-full text-muted-foreground hover:bg-card hover:text-foreground ${activeFileId === file._id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-            onClick={(e) => handleCloseTab(e, file)}
+    <div className="flex items-center justify-between bg-card border-b h-[40px]">
+      <div className="flex items-center">
+        {openFiles.map((file) => (
+          <div
+            key={file._id}
+            className={`flex items-center px-3 h-[40px] text-sm border-r cursor-pointer group ${activeFileId === file._id ? 'bg-background text-foreground' : 'bg-card text-muted-foreground hover:bg-background'}`}
+            onClick={() => handleTabClick(file)}
           >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      ))}
+            <FileIcon filename={file.name} className="h-4 w-4 mr-2" />
+            <span className="mr-2">{file.name}</span>
+            <button
+              className={`p-1 rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground ${activeFileId === file._id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+              onClick={(e) => handleCloseTab(e, file)}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+       <div className="flex items-center pr-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+            <SplitSquareHorizontal size={16} />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+            <BookText size={16} />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Sparkles size={16} />
+        </Button>
+      </div>
     </div>
   )
 }

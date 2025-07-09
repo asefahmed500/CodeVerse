@@ -1,9 +1,9 @@
 
 "use client";
 
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useActiveView } from "@/hooks/use-active-view";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, X, TerminalSquare, MessageSquareWarning, Sparkles, PencilRuler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 
@@ -16,47 +16,70 @@ const TerminalManager = dynamic(
 );
 
 export function Panel() {
-  const { activeView, setActiveView, toggleActiveView } = useActiveView();
+  const [activeTab, setActiveTab] = useState<string | null>("terminal");
+  const [isCollapsed, setCollapsed] = useState(false);
 
-  const isPanelVisible = activeView === "terminal";
+  const handleTabChange = (value: string) => {
+    if (isCollapsed) {
+      setCollapsed(false);
+      setActiveTab(value);
+    } else if (activeTab === value) {
+      setCollapsed(true);
+    } else {
+      setActiveTab(value);
+    }
+  };
 
   const handleTogglePanel = () => {
-    toggleActiveView("terminal");
+    setCollapsed(!isCollapsed);
   };
   
   const handleClosePanel = () => {
-    if (activeView === 'terminal') {
-      setActiveView(null);
-    }
+    setCollapsed(true);
   }
+
+  const isPanelVisible = !isCollapsed;
 
   return (
     <div
-      className={`flex flex-col border-t border-border transition-all duration-200 ease-in-out ${
+      className={`flex flex-col border-t bg-card transition-all duration-200 ease-in-out ${
         isPanelVisible ? "h-64" : "h-8"
       }`}
     >
       <Tabs
-        value={isPanelVisible ? "terminal" : ""}
-        className="flex flex-col h-full bg-card"
-        onValueChange={(value) => {
-            if (value === 'terminal') {
-                setActiveView('terminal');
-            }
-        }}
+        value={isPanelVisible ? activeTab || "" : ""}
+        className="flex flex-col h-full"
+        onValueChange={handleTabChange}
       >
-        <div className="flex items-center justify-between h-8 flex-shrink-0">
+        <div className="flex items-center justify-between h-8 flex-shrink-0 px-2 border-b">
           <TabsList className="bg-transparent h-8 p-0">
             <TabsTrigger
-              value="terminal"
-              className="h-full text-xs rounded-none border-t-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3"
-              onClick={handleTogglePanel}
+              value="problems"
+              className="h-full text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3 flex items-center gap-2"
             >
-              TERMINAL
+              <MessageSquareWarning className="h-4 w-4" /> Problems
+            </TabsTrigger>
+            <TabsTrigger
+              value="terminal"
+              className="h-full text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3 flex items-center gap-2"
+            >
+              <TerminalSquare className="h-4 w-4" /> Terminal
+            </TabsTrigger>
+             <TabsTrigger
+              value="fix"
+              className="h-full text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3 flex items-center gap-2"
+            >
+              <PencilRuler className="h-4 w-4" /> Fix & Refactor
+            </TabsTrigger>
+             <TabsTrigger
+              value="explain"
+              className="h-full text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground hover:text-foreground px-3 flex items-center gap-2"
+            >
+              <Sparkles className="h-4 w-4" /> Explain
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex items-center gap-1 mr-2">
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
@@ -82,8 +105,17 @@ export function Panel() {
 
         {isPanelVisible && (
           <div className="flex-1 bg-background overflow-hidden">
+            <TabsContent value="problems" className="h-full mt-0 p-4 text-sm text-muted-foreground">
+              No problems have been detected.
+            </TabsContent>
             <TabsContent value="terminal" className="h-full mt-0">
               <TerminalManager />
+            </TabsContent>
+             <TabsContent value="fix" className="h-full mt-0 p-4 text-sm text-muted-foreground">
+              AI-powered fix and refactor suggestions will appear here.
+            </TabsContent>
+             <TabsContent value="explain" className="h-full mt-0 p-4 text-sm text-muted-foreground">
+              Code explanations from our AI assistant will appear here.
             </TabsContent>
           </div>
         )}

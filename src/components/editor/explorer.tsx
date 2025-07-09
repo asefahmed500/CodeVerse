@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil, Folder } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil, Folder, Search } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useRouter } from "next/navigation";
 import type { FileType } from "@/types";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 import { ScrollArea } from "../ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 function CreationInput({
   type,
@@ -65,7 +66,7 @@ function CreationInput({
           onBlur={handleCreate}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleCreate();
-            if (e.key === 'Escape') onComplete(''); // Empty name cancels
+            if (e.key === 'Escape') onComplete('');
           }}
           onClick={(e) => e.stopPropagation()}
           className="h-6 text-sm bg-background border-primary"
@@ -78,6 +79,7 @@ function CreationInput({
 export function Explorer() {
   const { activeView } = useActiveView();
   const [creating, setCreating] = useState<{ type: 'file' | 'folder'; parentId: string | null } | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toggleFolder, expandedFolders, createFile, createFolder } = useFileSystem();
   const router = useRouter();
 
@@ -110,20 +112,32 @@ export function Explorer() {
   return (
     <div className="h-full flex flex-col bg-card text-card-foreground select-none">
         <div className="p-2 border-b border-border flex items-center justify-between group">
-        <h3 className="font-bold text-sm uppercase">Explorer</h3>
-        <div className="flex items-center">
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStartCreation('file', null)}>
-            <FilePlus size={16}/>
-            </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStartCreation('folder', null)}>
-            <FolderPlus size={16}/>
-            </Button>
+          <h3 className="font-bold text-xs uppercase tracking-wider">Explorer</h3>
+          <div className="flex items-center">
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStartCreation('file', null)}>
+              <FilePlus size={16}/>
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStartCreation('folder', null)}>
+              <FolderPlus size={16}/>
+              </Button>
+          </div>
         </div>
+        <div className="p-2">
+            <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Search files..."
+                    className="h-8 pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
         </div>
         <FileTree
           creating={creating}
           onStartCreation={handleStartCreation}
           onCreationComplete={handleCreationComplete}
+          searchTerm={searchTerm}
         />
     </div>
   );
@@ -132,14 +146,50 @@ export function Explorer() {
 function FileTree({ 
     creating, 
     onStartCreation, 
-    onCreationComplete 
+    onCreationComplete,
+    searchTerm,
 }: {
   creating: { type: 'file' | 'folder'; parentId: string | null } | null;
   onStartCreation: (type: 'file' | 'folder', parentId: string | null) => void;
   onCreationComplete: (name: string, type: 'file' | 'folder', parentId: string | null) => void;
+  searchTerm: string;
 }) {
   const { files, loading, expandedFolders } = useFileSystem();
 
+  const filteredFiles = useMemo(() => {
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    if (!lowerCaseSearch) return files;
+    
+    const allFiles = useFileSystem.getState().allFiles;
+    const fileMap = new Map(allFiles.map(f => [f._id, f]));
+    const matchingIds = new Set<string>();
+
+    // Find all files that match the search term
+    for (const file of allFiles) {
+      if (file.name.toLowerCase().includes(lowerCaseSearch)) {
+        matchingIds.add(file._id);
+        // Add all parents to ensure the path is visible
+        let currentParentId = file.parentId;
+        while(currentParentId) {
+            matchingIds.add(currentParentId);
+            const parent = fileMap.get(currentParentId);
+            currentParentId = parent?.parentId ?? null;
+        }
+      }
+    }
+
+    const filterRec = (nodes: FileType[]): FileType[] => {
+      return nodes.filter(node => matchingIds.has(node._id)).map(node => {
+        if (node.isFolder && node.children) {
+          return {...node, children: filterRec(node.children)};
+        }
+        return node;
+      });
+    }
+
+    return filterRec(files);
+  }, [files, searchTerm]);
+  
   const renderFile = (file: FileType, depth: number) => (
     <React.Fragment key={file._id}>
       <FileTreeItem
@@ -164,24 +214,16 @@ function FileTree({
   );
 
   return (
-    <ScrollArea className="flex-1 p-1">
-      <Collapsible defaultOpen>
-        <CollapsibleTrigger className="flex items-center p-1 font-bold text-sm uppercase w-full">
-            <ChevronRight size={16} className="transform transition-transform duration-200 data-[state=open]:rotate-90"/>
-            <span className="ml-1">CODEVERSE WORKSPACE</span>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-            {loading ? <p className="p-2 text-xs">Loading...</p> : files.map(file => renderFile(file, 0))}
-            {creating && creating.parentId === null && (
-              <CreationInput
-                type={creating.type}
-                parentId={null}
-                depth={0}
-                onComplete={(name) => onCreationComplete(name, creating.type, null)}
-              />
-            )}
-        </CollapsibleContent>
-      </Collapsible>
+    <ScrollArea className="flex-1 px-2">
+      {loading ? <p className="p-2 text-xs">Loading...</p> : filteredFiles.map(file => renderFile(file, 0))}
+      {creating && creating.parentId === null && (
+        <CreationInput
+          type={creating.type}
+          parentId={null}
+          depth={0}
+          onComplete={(name) => onCreationComplete(name, creating.type, null)}
+        />
+      )}
     </ScrollArea>
   );
 }
@@ -280,7 +322,7 @@ function FileTreeItem({
           <div data-context-menu-trigger="true" className="w-full"></div>
       </DropdownMenuTrigger>
       <div
-          className={`flex items-center py-1 px-2 rounded hover:bg-accent cursor-pointer group ${activeFileId === file._id ? "bg-muted" : ""}`}
+          className={cn(`flex items-center py-1 px-2 rounded cursor-pointer group`, activeFileId === file._id && "bg-accent text-accent-foreground")}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={handleItemClick}
           onContextMenu={handleContextMenu}
