@@ -27,23 +27,23 @@ export default function EditorFilePage() {
   const fileToRender = findFile(fileId);
 
   useEffect(() => {
-    // This effect handles setting the active file and redirecting if necessary.
+    // This effect handles setting the active file and redirecting if the ID points to a folder.
     if (fileToRender) {
       if (fileToRender.isFolder) {
-        // If the route is for a folder, redirect to the editor root.
+        // If the route is for a folder, it's not a valid editor page. Redirect.
         router.replace('/editor');
         return;
       }
-      // This will also mark it as open and active in the file system state.
+      // If the file is valid, ensure it's marked as active in the global state.
       setActiveFileId(fileId);
     }
-    // If the file is not found (fileToRender is null), we do nothing here.
-    // The component will render a loading spinner, waiting for the file system
-    // state to update (e.g., after a new file is created).
+    // If fileToRender is null, we wait. The spinner below will be shown.
+    // The component will re-render once the file system state updates.
   }, [fileId, fileToRender, router, setActiveFileId]);
 
   // Render a spinner if the file system is still loading initially,
   // or if the specific file for this route hasn't been found in the state yet.
+  // This is key to preventing the 404 race condition.
   if (fileSystemLoading || !fileToRender) {
     return (
       <div className="flex items-center justify-center flex-1 h-full bg-background">
@@ -52,14 +52,9 @@ export default function EditorFilePage() {
     );
   }
   
+  // This check is a safeguard, but the useEffect should handle the redirect.
   if (fileToRender.isFolder) {
-      // A final check before rendering the editor. This should be covered by the useEffect,
-      // but it's good defensive programming.
-      return (
-        <div className="flex items-center justify-center flex-1 h-full bg-background">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        </div>
-      );
+      return null;
   }
 
   return (

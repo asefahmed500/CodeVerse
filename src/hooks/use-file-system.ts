@@ -136,21 +136,10 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const createdFile: FileType = await res.json();
         
         set(produce((state: FileSystemState) => {
-            const newFileWithState = {
-                ...createdFile,
-                isOpen: true,
-                isActive: true
-            };
+            const newAllFiles = [...state.allFiles, createdFile];
+            state.allFiles = newAllFiles;
+            state.files = buildFileTree(newAllFiles);
             
-            const currentActive = state.allFiles.find(f => f._id === state.activeFileId);
-            if (currentActive) {
-                currentActive.isActive = false;
-            }
-            
-            state.allFiles.push(newFileWithState);
-            state.files = buildFileTree(state.allFiles);
-            state.activeFileId = newFileWithState._id;
-
             if (parentId && !state.expandedFolders.includes(parentId)) {
                 state.expandedFolders.push(parentId);
             }
@@ -180,9 +169,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         const newFolder: FileType = await res.json();
         
         set(produce((state: FileSystemState) => {
-            const newFolderWithState = { ...newFolder, isOpen: false, isActive: false };
-            state.allFiles.push(newFolderWithState);
-            state.files = buildFileTree(state.allFiles);
+            const newAllFiles = [...state.allFiles, newFolder];
+            state.allFiles = newAllFiles;
+            state.files = buildFileTree(newAllFiles);
             if (parentId && !state.expandedFolders.includes(parentId)) {
                 state.expandedFolders.push(parentId);
             }
@@ -224,9 +213,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
         const updatedFile = await res.json();
         set(produce((state: FileSystemState) => {
-            const file = state.allFiles.find(f => f._id === fileId);
-            if(file) {
-              Object.assign(file, updatedFile);
+            const fileIndex = state.allFiles.findIndex(f => f._id === fileId);
+            if(fileIndex !== -1) {
+              state.allFiles[fileIndex] = { ...state.allFiles[fileIndex], ...updatedFile };
             }
             if(nameChanged) {
                 state.files = buildFileTree(state.allFiles);
@@ -257,23 +246,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             return { nextActiveFileId: get().activeFileId };
         }
         
-        set(produce((state: FileSystemState) => {
-            const idsToDelete = new Set<string>([fileId]);
-            if (fileToDelete.isFolder) {
-                const findDescendants = (parentId: string) => {
-                    state.allFiles.forEach(f => {
-                        if (f.parentId === parentId) {
-                            idsToDelete.add(f._id);
-                            if (f.isFolder) findDescendants(f._id);
-                        }
-                    });
-                };
-                findDescendants(fileId);
-            }
-            state.allFiles = state.allFiles.filter(f => !idsToDelete.has(f._id));
-            state.files = buildFileTree(state.allFiles);
-            state.dirtyFileIds = state.dirtyFileIds.filter(id => !idsToDelete.has(id));
-        }));
+        await get().fetchFiles(); // Re-fetch to get the new state from server
 
         toast.success(`Deleted ${fileToDelete.name}.`);
         return { nextActiveFileId };
@@ -319,7 +292,12 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
     setActiveFileId: (fileId) => {
         set(produce((state: FileSystemState) => {
-            if (state.activeFileId === fileId) return;
+            if (state.activeFileId === fileId) {
+                // If already active, just ensure its open state is correct if it's a file
+                const newActive = fileId ? state.allFiles.find(f => f._id === fileId) : null;
+                if (newActive && !newActive.isFolder) newActive.isOpen = true;
+                return;
+            };
 
             const oldActive = state.allFiles.find(f => f._id === state.activeFileId);
             if (oldActive) oldActive.isActive = false;

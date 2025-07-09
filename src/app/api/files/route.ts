@@ -209,22 +209,29 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
 
-        const idsToDelete: string[] = [fileToDelete._id];
+        const idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         // If it's a folder, find all descendants to delete
         if (fileToDelete.isFolder) {
-            const findDescendants = async (parentId: string) => {
-                const children = await File.find({ parentId: parentId, userId });
-                for (const child of children) {
-                    idsToDelete.push(child._id);
-                    if (child.isFolder) {
-                        await findDescendants(child._id);
+            const aggregateResult = await File.aggregate([
+                { $match: { _id: fileToDelete._id, userId: new mongoose.Types.ObjectId(userId) } },
+                {
+                    $graphLookup: {
+                        from: 'files',
+                        startWith: '$_id',
+                        connectFromField: '_id',
+                        connectToField: 'parentId',
+                        as: 'descendants'
                     }
-                }
-            };
-            await findDescendants(fileToDelete._id);
+                },
+                { $project: { allIds: { $concatArrays: [['$_id'], '$descendants._id'] } } }
+            ]);
+            if (aggregateResult.length > 0) {
+                idsToDelete.push(...aggregateResult[0].allIds);
+            }
         }
         
-        await File.deleteMany({ _id: { $in: idsToDelete }, userId });
+        const uniqueIds = [...new Set(idsToDelete.map(id => id.toString()))];
+        await File.deleteMany({ _id: { $in: uniqueIds }, userId });
 
         return NextResponse.json({ message: "Deleted successfully" }, { status: 200 });
     } catch (error) {
