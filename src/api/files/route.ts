@@ -5,70 +5,6 @@ import File from "@/models/file";
 import type { FileType } from "@/types";
 import mongoose from "mongoose";
 
-// Helper function to build a tree from a flat list of files
-const buildTree = (files: any[]): FileType[] => {
-    const fileMap = new Map();
-    const tree: FileType[] = [];
-
-    files.forEach(file => {
-        const fileDoc = file._doc ? file._doc : file; // Handle mongoose document weirdness
-        const fileJSON = {
-            ...fileDoc,
-            _id: fileDoc._id.toString(),
-            parentId: fileDoc.parentId ? fileDoc.parentId.toString() : null,
-        }
-        fileMap.set(fileJSON._id, { ...fileJSON, children: [] });
-    });
-
-    fileMap.forEach(file => {
-        if (file.parentId && fileMap.has(file.parentId)) {
-            const parent = fileMap.get(file.parentId);
-            if (parent) {
-                parent.children.push(file);
-            }
-        } else {
-            tree.push(file);
-        }
-    });
-
-    // Sort children alphabetically, folders first
-    const sortChildren = (nodes: FileType[]) => {
-      nodes.sort((a, b) => {
-        if (a.isFolder && !b.isFolder) return -1;
-        if (!a.isFolder && b.isFolder) return 1;
-        return a.name.localeCompare(b.name);
-      });
-      nodes.forEach(node => {
-        if (node.children) {
-          sortChildren(node.children);
-        }
-      });
-    };
-    sortChildren(tree);
-
-
-    return tree;
-}
-
-// GET all files for a user
-export async function GET(request: Request) {
-    const session = await auth();
-    if (!session || !(session.user as any)?.id) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const userId = (session.user as any).id;
-
-    try {
-        await dbConnect();
-        const files = await File.find({ userId }).sort({ isFolder: -1, name: 1 }).lean();
-        const tree = buildFileTree(files);
-        return NextResponse.json(tree);
-    } catch (error) {
-        console.error("GET /api/files Error:", error);
-        return NextResponse.json({ error: "Failed to fetch files" }, { status: 500 });
-    }
-}
-
 const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string): Promise<mongoose.Types.ObjectId[]> => {
     const descendants: mongoose.Types.ObjectId[] = [];
     const queue: mongoose.Types.ObjectId[] = [fileId];
@@ -86,6 +22,36 @@ const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string):
     return descendants;
 };
 
+
+// GET all files for a user
+export async function GET(request: Request) {
+    const session = await auth();
+    if (!session || !(session.user as any)?.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as any).id;
+
+    try {
+        await dbConnect();
+        const files = await File.find({ userId }).lean();
+        
+        // Sanitize the files for the client, converting ObjectIds to strings
+        const sanitizedFiles = files.map(file => ({
+            ...file,
+            _id: file._id.toString(),
+            userId: file.userId.toString(),
+            parentId: file.parentId ? file.parentId.toString() : null,
+            // Ensure client-side fields are present
+            isOpen: false,
+            isActive: false,
+        }));
+        
+        return NextResponse.json(sanitizedFiles);
+    } catch (error) {
+        console.error("GET /api/files Error:", error);
+        return NextResponse.json({ error: "Failed to fetch files" }, { status: 500 });
+    }
+}
 
 // POST to create a file/folder or perform bulk actions
 export async function POST(request: Request) {
