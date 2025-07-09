@@ -21,20 +21,16 @@ export async function GET(
 
   try {
     await dbConnect();
-    // Ensure the file belongs to the authenticated user
     const file = await File.findOne({ _id: fileId, userId }).lean();
 
     if (!file) {
       return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
     }
 
-    // Sanitize the response object to match what the client expects.
-    // Convert ObjectId instances to strings for serialization.
     const fileJSON = {
       ...file,
       _id: file._id.toString(),
       parentId: file.parentId ? file.parentId.toString() : null,
-      // Ensure client-side fields are present even if not in DB
       isOpen: false, 
       isActive: false, 
     };
@@ -42,6 +38,6 @@ export async function GET(
     return NextResponse.json(fileJSON);
   } catch (error) {
     console.error(`GET /api/files/${fileId} Error:`, error);
-    return NextResponse.json({ error: "Failed to fetch file" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch file due to a server error." }, { status: 500 });
   }
 }

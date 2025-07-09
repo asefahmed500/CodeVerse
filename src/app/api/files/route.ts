@@ -22,7 +22,6 @@ const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string):
     return descendants;
 };
 
-
 // GET all files for a user
 export async function GET(request: Request) {
     const session = await auth();
@@ -35,13 +34,11 @@ export async function GET(request: Request) {
         await dbConnect();
         const files = await File.find({ userId }).lean();
         
-        // Sanitize the files for the client, converting ObjectIds to strings
         const sanitizedFiles = files.map(file => ({
             ...file,
             _id: file._id.toString(),
             userId: file.userId.toString(),
             parentId: file.parentId ? file.parentId.toString() : null,
-            // Ensure client-side fields are present
             isOpen: false,
             isActive: false,
         }));
@@ -49,7 +46,7 @@ export async function GET(request: Request) {
         return NextResponse.json(sanitizedFiles);
     } catch (error) {
         console.error("GET /api/files Error:", error);
-        return NextResponse.json({ error: "Failed to fetch files" }, { status: 500 });
+        return NextResponse.json({ error: "Failed to fetch files due to a server error." }, { status: 500 });
     }
 }
 
@@ -66,7 +63,6 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
 
-        // Handle duplicating a file or folder
         if (action === 'duplicate') {
             const { sourceId } = await request.json();
             if (!mongoose.Types.ObjectId.isValid(sourceId)) {
@@ -91,25 +87,20 @@ export async function POST(request: Request) {
                     
                     let counter = 1;
                     let candidateName = `${baseName} copy${extension}`;
-                    if(siblingNames.includes(candidateName)) {
-                        while (siblingNames.includes(candidateName)) {
-                            counter++;
-                            candidateName = `${baseName} copy ${counter}${extension}`;
-                        }
+                    while (siblingNames.includes(candidateName)) {
+                        counter++;
+                        candidateName = `${baseName} copy ${counter}${extension}`;
                     }
                     newName = candidateName;
                 } else {
-                     let counter = 1;
+                    let counter = 1;
                     let candidateName = `${newName} copy`;
-                    if(siblingNames.includes(candidateName)) {
-                        while (siblingNames.includes(candidateName)) {
-                            counter++;
-                            candidateName = `${newName} copy ${counter}`;
-                        }
+                    while (siblingNames.includes(candidateName)) {
+                        counter++;
+                        candidateName = `${newName} copy ${counter}`;
                     }
                     newName = candidateName;
                 }
-
 
                 const newNodeData = {
                     ...node,
@@ -132,7 +123,6 @@ export async function POST(request: Request) {
                         newNode.children.push(newChild);
                     }
                 }
-                 // Serialize the result correctly
                 return {
                     ...newNode,
                     _id: newNode._id.toString(),
@@ -144,14 +134,13 @@ export async function POST(request: Request) {
             return NextResponse.json(duplicated, { status: 201 });
         }
 
-        // Handle bulk creation for repo cloning
         if (action === 'bulkCreate') {
-            const { items } = await request.json(); // Expects an array of file objects
-             await File.deleteMany({ userId }); // Clear existing workspace
+            const { items } = await request.json(); 
+            await File.deleteMany({ userId });
             
             const createdItems = [];
             const pathIdMap = new Map<string, string>();
-            items.sort((a: any, b: any) => a.path.localeCompare(b.path)); // Process parent dirs first
+            items.sort((a: any, b: any) => a.path.localeCompare(b.path)); 
 
             for (const item of items) {
                 const parts = item.path.split('/');
@@ -168,7 +157,6 @@ export async function POST(request: Request) {
                 const savedItem = await newItem.save();
                 const savedObject = savedItem.toObject();
 
-
                 if (item.isFolder) {
                     pathIdMap.set(item.path, savedItem._id.toString());
                 }
@@ -177,7 +165,6 @@ export async function POST(request: Request) {
             return NextResponse.json(createdItems, { status: 201 });
         }
         
-        // Handle single file/folder creation
         const fileData = await request.json();
         const newFile = new File({
             ...fileData,
@@ -189,12 +176,13 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error("POST /api/files Error:", error);
-        return NextResponse.json({ error: "Operation failed" }, { status: 500 });
+        if (error instanceof mongoose.Error.ValidationError) {
+            return NextResponse.json({ error: `Validation Error: ${error.message}` }, { status: 400 });
+        }
+        return NextResponse.json({ error: "Operation failed due to a server error." }, { status: 500 });
     }
 }
 
-
-// PUT to update a file/folder
 export async function PUT(request: Request) {
     const session = await auth();
     if (!session || !(session.user as any)?.id) {
@@ -211,17 +199,14 @@ export async function PUT(request: Request) {
     try {
         await dbConnect();
         const updates = await request.json();
-        // Ensure updatedAt is set
         updates.updatedAt = new Date();
-
-        // The client manages these, so don't let them be overwritten
         delete updates.isOpen;
         delete updates.isActive;
 
         const updatedFile = await File.findOneAndUpdate(
             { _id: fileId, userId },
             { $set: updates },
-            { new: true }
+            { new: true, runValidators: true }
         ).lean();
 
         if (!updatedFile) {
@@ -230,11 +215,13 @@ export async function PUT(request: Request) {
         return NextResponse.json({ ...updatedFile, _id: updatedFile._id.toString(), parentId: updatedFile.parentId?.toString() || null });
     } catch (error) {
         console.error("PUT /api/files Error:", error);
-        return NextResponse.json({ error: "Failed to update file" }, { status: 500 });
+        if (error instanceof mongoose.Error.ValidationError) {
+            return NextResponse.json({ error: `Validation Error: ${error.message}` }, { status: 400 });
+        }
+        return NextResponse.json({ error: "Failed to update file due to a server error." }, { status: 500 });
     }
 }
 
-// DELETE a file/folder
 export async function DELETE(request: Request) {
     const session = await auth();
     if (!session || !(session.user as any)?.id) {
@@ -256,7 +243,6 @@ export async function DELETE(request: Request) {
         }
     }
 
-
     if (!fileId) {
         return NextResponse.json({ error: "File ID is required" }, { status: 400 });
     }
@@ -270,7 +256,6 @@ export async function DELETE(request: Request) {
         
         let idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         
-        // If it's a folder, recursively find all descendant IDs
         if (fileToDelete.isFolder) {
             const descendantIds = await findDescendants(fileToDelete._id, userId);
             idsToDelete = idsToDelete.concat(descendantIds);
@@ -282,6 +267,6 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ message: "Deleted successfully", deletedIds: uniqueIds }, { status: 200 });
     } catch (error) {
         console.error("DELETE /api/files Error:", error);
-        return NextResponse.json({ error: "Failed to delete file(s)" }, { status: 500 });
+        return NextResponse.json({ error: "Failed to delete file(s) due to a server error." }, { status: 500 });
     }
 }
