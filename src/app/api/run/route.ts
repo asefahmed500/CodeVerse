@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 import { auth } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -12,7 +12,8 @@ export async function POST(request: Request) {
   const { source_code, language_id } = await request.json();
 
   if (!process.env.JUDGE0_API_KEY) {
-      return NextResponse.json({ error: "Judge0 API key not configured." }, { status: 500 });
+      console.error("Judge0 API key not configured.");
+      return NextResponse.json({ error: "Code execution service is not configured on the server." }, { status: 500 });
   }
 
   if (!source_code || !language_id) {
@@ -27,8 +28,8 @@ export async function POST(request: Request) {
     url: 'https://judge0-ce.p.rapidapi.com/submissions',
     params: {
       base64_encoded: 'false',
-      wait: 'true', // Wait for the execution to complete
-      fields: '*'
+      wait: 'true', // Use wait=true to simplify and avoid polling
+      fields: '*'   // Get all fields in the response
     },
     headers: {
       'content-type': 'application/json',
@@ -45,9 +46,32 @@ export async function POST(request: Request) {
     const response = await axios.request(options);
     return NextResponse.json(response.data);
   } catch (error: any) {
-    console.error("Judge0 API Error:", error.response?.data || error.message);
-    const status = error.response?.status || 500;
-    const message = error.response?.data?.error || "Failed to execute code";
+    console.error("Judge0 API Error:", error);
+    let message = "An unexpected error occurred during code execution.";
+    let status = 500;
+
+    if (isAxiosError(error)) {
+        if (error.response) {
+            status = error.response.status;
+            const responseData = error.response.data;
+
+            if (status === 401 || status === 403) {
+                 message = "Code execution failed: The API Key for the execution service is invalid or missing.";
+            } else if (responseData && typeof responseData === 'object') {
+                 message = (responseData as any).error || (responseData as any).message || `Judge0 responded with status ${status}`;
+            } else {
+                 message = `Judge0 responded with status ${status}`;
+            }
+            console.error("Judge0 Response Error Data:", error.response.data);
+        } else if (error.request) {
+            message = "No response received from the code execution service. It might be down or blocked by network policies.";
+        } else {
+            message = `Error setting up the code execution request: ${error.message}`;
+        }
+    } else if (error instanceof Error) {
+        message = error.message;
+    }
+    
     return NextResponse.json({ error: message }, { status });
   }
 }
