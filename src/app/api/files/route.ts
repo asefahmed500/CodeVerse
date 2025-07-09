@@ -7,43 +7,53 @@ import mongoose from "mongoose";
 
 // Helper function to build a tree from a flat list of files
 const buildFileTree = (files: any[]): FileType[] => {
-    const fileMap = new Map();
-    const tree: FileType[] = [];
+    const fileMap = new Map<string, FileType & { children: FileType[] }>();
+    const tree: (FileType & { children: FileType[] })[] = [];
 
+    // First pass: create a map of nodes and initialize children arrays.
     files.forEach(file => {
-        const fileDoc = file._doc ? file._doc : file;
-        const fileJSON = {
-            ...fileDoc,
-            _id: fileDoc._id.toString(),
-            parentId: fileDoc.parentId ? fileDoc.parentId.toString() : null,
-        }
-        fileMap.set(fileJSON._id, { ...fileJSON, children: [] });
+        const doc = file._doc ? file._doc : file;
+        const node: FileType & { children: FileType[] } = {
+            _id: doc._id.toString(),
+            name: doc.name,
+            content: doc.content,
+            isFolder: doc.isFolder,
+            parentId: doc.parentId ? doc.parentId.toString() : null,
+            language: doc.language,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt,
+            // These are client-side, but let's initialize them
+            isOpen: false,
+            isActive: false,
+            children: [],
+        };
+        fileMap.set(node._id, node);
     });
 
-    fileMap.forEach(file => {
-        if (file.parentId && fileMap.has(file.parentId)) {
-            const parent = fileMap.get(file.parentId);
-            if (parent) {
-                parent.children.push(file);
-            }
+    // Second pass: link children to their parents.
+    fileMap.forEach(node => {
+        if (node.parentId && fileMap.has(node.parentId)) {
+            // The `!` is safe here because we check with .has()
+            fileMap.get(node.parentId)!.children.push(node);
         } else {
-            tree.push(file);
+            tree.push(node);
         }
     });
 
-    // Sort children alphabetically, folders first
-    const sortChildren = (nodes: FileType[]) => {
+    // Sort all children recursively
+    const sortChildren = (nodes: (FileType & { children: FileType[] })[]) => {
       nodes.sort((a, b) => {
         if (a.isFolder && !b.isFolder) return -1;
         if (!a.isFolder && b.isFolder) return 1;
         return a.name.localeCompare(b.name);
       });
       nodes.forEach(node => {
-        if (node.children) {
+        if (node.children && node.children.length > 0) {
           sortChildren(node.children);
         }
       });
     };
+
     sortChildren(tree);
 
     return tree;
