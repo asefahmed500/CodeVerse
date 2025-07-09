@@ -1,8 +1,19 @@
+"use client";
+
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Cloud, CodeXml, GitFork } from "lucide-react";
+import dynamic from 'next/dynamic'
+
+const HeroAnimation = dynamic(
+  () => import('@/components/hero-animation').then((mod) => mod.HeroAnimation),
+  { 
+    ssr: false,
+    loading: () => <div className="h-[400px] w-full" />
+  }
+);
+
 
 export default function Home() {
   return (
@@ -43,17 +54,8 @@ export default function Home() {
                   </Link>
                 </div>
               </div>
-              <div className="relative group animate-in fade-in zoom-in-90 duration-500 delay-300">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-cyan-400 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
-                <Image
-                  src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=2070&auto=format&fit=crop"
-                  data-ai-hint="code editor"
-                  width="600"
-                  height="400"
-                  alt="Screenshot of the CodeVerse editor interface"
-                  className="relative mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full shadow-2xl"
-                  priority
-                />
+              <div className="flex items-center justify-center min-h-[400px]">
+                <HeroAnimation />
               </div>
             </div>
           </div>
