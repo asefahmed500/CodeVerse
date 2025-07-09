@@ -1,4 +1,3 @@
-
 "use client";
 
 import { ActivityBar } from "@/components/editor/activity-bar";
