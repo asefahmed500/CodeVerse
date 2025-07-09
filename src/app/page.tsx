@@ -40,11 +40,10 @@ export default function Home() {
                 </div>
               </div>
               <Image
-                src="https://placehold.co/700x500.png"
+                src="https://images.unsplash.com/photo-1555066931-4365d14bab8c"
                 width="700"
                 height="500"
-                alt="CodeVerse IDE Screenshot"
-                data-ai-hint="code editor screenshot"
+                alt="Code editor showing HTML code on a screen"
                 className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square shadow-2xl shadow-primary/10"
               />
             </div>
