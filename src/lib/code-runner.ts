@@ -20,19 +20,18 @@ export const executeCode = async (
                 language_id: languageId,
             }),
         });
+        
+        const result = await response.json();
 
         if (!response.ok) {
-            const errorData = await response.json();
             return { 
                 logs: [], 
-                errorLogs: [],
+                errorLogs: [result.error || `Request failed with status ${response.status}`],
                 compileError: null,
-                executionError: errorData.error || `Request failed with status ${response.status}`,
+                executionError: null,
                 hasError: true
             };
         }
-
-        const result = await response.json();
         
         const logs = result.stdout ? result.stdout.split('\n').filter((l: string) => l.trim() !== '') : [];
         const errorLogs = result.stderr ? result.stderr.split('\n').filter((l: string) => l.trim() !== '') : [];
@@ -50,9 +49,9 @@ export const executeCode = async (
     } catch (e: any) {
         return { 
             logs: [], 
-            errorLogs: [],
+            errorLogs: [`An unexpected client-side error occurred: ${e.message}`],
             compileError: null,
-            executionError: `An unexpected network error occurred: ${e.message}`,
+            executionError: null,
             hasError: true
         };
     }
