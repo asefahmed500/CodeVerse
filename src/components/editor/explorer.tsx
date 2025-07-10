@@ -256,7 +256,6 @@ function FileTreeItem({
   const handleContextMenuTrigger = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setActiveFileId(file._id);
   }
 
   const handleRename = async () => {
