@@ -277,13 +277,15 @@ function FileTreeItem({
     await duplicateFileOrFolder(file._id);
   }
   
-  const handleNewFile = () => {
+  const handleNewFile = (e: Event) => {
+    e.stopPropagation();
     if (file.isFolder) {
       onStartCreation('file', file._id);
     }
   }
   
-  const handleNewFolder = () => {
+  const handleNewFolder = (e: Event) => {
+    e.stopPropagation();
     if (file.isFolder) {
       onStartCreation('folder', file._id);
     }

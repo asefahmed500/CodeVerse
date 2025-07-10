@@ -15,13 +15,31 @@ import { useFileSystem } from "@/hooks/use-file-system";
 
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
 
-const findNodeByPath = (allFiles: FileType[], path: string): FileType | null => {
-    if (path === '/') {
-        // This is a virtual root, not a real file object
-        return { _id: 'root', name: '/', isFolder: true, content: '', parentId: null, language: '', isOpen: false, isActive: false, createdAt: new Date(), updatedAt: new Date(), children: allFiles.filter(f => !f.parentId) };
+const findNodeByPath = (allFiles: FileType[], currentPath: string, targetPath: string): FileType | null => {
+    let resolvedPath: string;
+    if (targetPath.startsWith('/')) {
+        resolvedPath = targetPath; // Absolute path
+    } else {
+        // Relative path
+        const pathParts = currentPath.split('/').filter(Boolean);
+        const targetParts = targetPath.split('/');
+
+        for (const part of targetParts) {
+            if (part === '..') {
+                pathParts.pop();
+            } else if (part !== '.') {
+                pathParts.push(part);
+            }
+        }
+        resolvedPath = '/' + pathParts.join('/');
+    }
+
+    if (resolvedPath === '/') {
+        const rootChildren = allFiles.filter(f => !f.parentId);
+        return { _id: 'root', name: '/', isFolder: true, content: '', parentId: null, language: '', isOpen: false, isActive: false, createdAt: new Date(), updatedAt: new Date(), children: rootChildren };
     }
     
-    const parts = path.split('/').filter(Boolean);
+    const parts = resolvedPath.split('/').filter(Boolean);
     let currentNode: FileType | null = null;
     let currentChildren = allFiles.filter(f => !f.parentId);
 
@@ -34,8 +52,7 @@ const findNodeByPath = (allFiles: FileType[], path: string): FileType | null => 
         if (foundNode.isFolder) {
             currentChildren = allFiles.filter(f => f.parentId === foundNode._id);
         } else if (i < parts.length - 1) {
-            // It's a file, but not the last part of the path
-            return null;
+            return null; // It's a file, but not the last part of the path
         }
     }
     return currentNode;
@@ -90,8 +107,8 @@ export function Terminal({
             term.writeln(`\r\n${cmd}: missing file path`);
             return;
         }
-        const fullPath = pathArg.startsWith('/') ? pathArg : `${currentPath === '/' ? '' : currentPath}/${pathArg}`;
-        const fileToRun = findNodeByPath(allFiles, fullPath);
+        
+        const fileToRun = findNodeByPath(allFiles, currentPath, pathArg);
         const langConfig = fileToRun ? getLanguageConfigFromFilename(fileToRun.name) : null;
         
         if (fileToRun && !fileToRun.isFolder && langConfig && langConfig.judge0Id) {
@@ -145,7 +162,7 @@ export function Terminal({
             term.writeln(`  ${runners} [file]`);
             break;
         case 'ls':
-            const children = findNodeByPath(allFiles, currentPath)?.children || [];
+            const children = findNodeByPath(allFiles, currentPath, '.')?.children || [];
             if (children.length === 0) {
                 term.writeln('\r\n(empty)');
             } else {
@@ -157,19 +174,12 @@ export function Terminal({
             break;
         case 'cd':
             const target = args[0] || '/';
-            if (target === '..') {
-                const newPath = currentPath === '/' ? '/' : currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
-                setCurrentPath(newPath);
+            const node = findNodeByPath(allFiles, currentPath, target);
+            if (node && node.isFolder) {
+                const pathParts = node._id === 'root' ? [] : (useFileSystem.getState().getPathForFile(node._id)).split('/');
+                setCurrentPath('/' + pathParts.filter(Boolean).join('/'));
             } else {
-                const newPath = target.startsWith('/') ? target : `${currentPath === '/' ? '' : currentPath}/${target}`;
-                const node = findNodeByPath(allFiles, newPath);
-                if (node && node.isFolder) {
-                    setCurrentPath(newPath);
-                } else if (newPath === '/') {
-                    setCurrentPath('/');
-                } else {
-                    term.writeln(`\r\ncd: no such file or directory: ${target}`);
-                }
+                term.writeln(`\r\ncd: no such file or directory: ${target}`);
             }
             break;
         case 'cat':
@@ -178,8 +188,7 @@ export function Terminal({
                 term.writeln('\r\ncat: missing operand');
                 break;
             }
-            const catPath = filename.startsWith('/') ? filename : `${currentPath === '/' ? '' : currentPath}/${filename}`;
-            const fileToRead = findNodeByPath(allFiles, catPath);
+            const fileToRead = findNodeByPath(allFiles, currentPath, filename);
 
             if (fileToRead && !fileToRead.isFolder) {
                 term.writeln(`\r\n${fileToRead.content.replace(/\n/g, '\r\n')}`);
