@@ -12,7 +12,7 @@ const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string):
     
     while(queue.length > 0) {
         const currentId = queue.shift()!;
-        const children = await File.find({ parentId: currentId, userId });
+        const children = await File.find({ parentId: currentId, userId }, '_id isFolder'); // Optimize projection
         for (const child of children) {
             descendants.push(child._id);
             if (child.isFolder) {
@@ -75,9 +75,9 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: "Original item not found or permission denied" }, { status: 404 });
             }
 
-            const duplicateRecursively = async (node: any, parentId: string | null): Promise<any> => {
+            const duplicateRecursively = async (node: any, newParentId: mongoose.Types.ObjectId | null): Promise<any> => {
                 const newId = new mongoose.Types.ObjectId();
-                const siblingNames = (await File.find({ parentId: parentId, userId }).lean()).map(f => f.name);
+                const siblingNames = (await File.find({ parentId: newParentId, userId }).lean()).map(f => f.name);
 
                 let newName = node.name;
                 
@@ -103,35 +103,40 @@ export async function POST(request: Request) {
                     newName = candidateName;
                 }
 
-                const newNodeData = {
-                    ...node,
+                const newNodeData: Partial<IFile> = {
                     _id: newId,
-                    userId,
-                    parentId,
+                    userId: new mongoose.Types.ObjectId(userId),
+                    parentId: newParentId,
+                    name: newName,
+                    content: node.content,
+                    isFolder: node.isFolder,
+                    language: node.language,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 };
-                delete newNodeData.children;
-
+                
                 const newNodeDoc = await File.create(newNodeData);
                 const newNode = newNodeDoc.toObject();
 
-                if (node.isFolder) {
-                    const children = await File.find({ parentId: node._id, userId });
-                    newNode.children = [];
-                    for (const child of children) {
-                        const newChild = await duplicateRecursively(child.toObject(), newId.toString());
-                        newNode.children.push(newChild);
-                    }
-                }
-                return {
+                const resultNode = {
                     ...newNode,
                     _id: newNode._id.toString(),
                     parentId: newNode.parentId ? newNode.parentId.toString() : null,
+                    children: [] as any[],
                 };
+
+                if (node.isFolder) {
+                    const children = await File.find({ parentId: node._id, userId }).lean();
+                    for (const child of children) {
+                        const newChild = await duplicateRecursively(child, newNode._id);
+                        resultNode.children.push(newChild);
+                    }
+                }
+
+                return resultNode;
             };
             
-            const duplicated = await duplicateRecursively(original, original.parentId ? original.parentId.toString() : null);
+            const duplicated = await duplicateRecursively(original, original.parentId);
             return NextResponse.json(duplicated, { status: 201 });
         }
 
@@ -200,9 +205,13 @@ export async function PUT(request: Request) {
     try {
         await dbConnect();
         const updates = await request.json();
-        updates.updatedAt = new Date();
+        // Prevent client from updating internal state fields
         delete updates.isOpen;
         delete updates.isActive;
+        delete updates.children;
+        delete updates._id;
+
+        updates.updatedAt = new Date();
 
         const updatedFile = await File.findOneAndUpdate(
             { _id: fileId, userId },
@@ -255,11 +264,11 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
         
-        let idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
+        const idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         
         if (fileToDelete.isFolder) {
             const descendantIds = await findDescendants(fileToDelete._id, userId);
-            idsToDelete = idsToDelete.concat(descendantIds);
+            idsToDelete.push(...descendantIds);
         }
 
         const uniqueIds = [...new Set(idsToDelete.map(id => id.toString()))];

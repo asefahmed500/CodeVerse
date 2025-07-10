@@ -239,8 +239,7 @@ function FileTreeItem({
   const { activeFileId, setActiveFileId, toggleFolder, expandedFolders, deleteFile, updateFile, duplicateFileOrFolder } = useFileSystem();
   const [isEditing, setIsEditing] = useState(false);
   const [editingValue, setEditingValue] = useState(file.name);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
+  
   const isExpanded = expandedFolders.includes(file._id);
 
   const handleItemClick = (e: React.MouseEvent) => {
@@ -254,11 +253,10 @@ function FileTreeItem({
     }
   };
   
-  const handleContextMenu = (e: React.MouseEvent) => {
+  const handleContextMenuTrigger = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setActiveFileId(file._id);
-    setIsMenuOpen(true);
   }
 
   const handleRename = async () => {
@@ -306,13 +304,13 @@ function FileTreeItem({
   }
   
   return (
-    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <div
             className={cn(`flex items-center py-1 px-2 rounded cursor-pointer group`, activeFileId === file._id && "bg-accent text-accent-foreground")}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             onClick={handleItemClick}
-            onContextMenu={handleContextMenu}
+            onContextMenu={handleContextMenuTrigger}
           >
             {file.isFolder ? (
               <ChevronRight size={16} className={`mr-1 transition-transform transform ${isExpanded ? 'rotate-90' : ''}`} />

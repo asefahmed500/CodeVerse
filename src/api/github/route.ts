@@ -6,8 +6,19 @@ const textFileExtensions = [
     '.js', '.jsx', '.ts', '.tsx', '.json', '.css', '.scss', '.html', '.htm', 
     '.md', '.txt', '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', 
     '.php', '.rb', '.rs', '.sh', '.yml', '.yaml', '.xml', '.toml', '.ini',
-    '.env', '.babelrc', '.eslintrc', '.prettierrc', 'package.json', 'tsconfig.json'
+    '.env', 'LICENSE', 'README', 'Makefile', 'Dockerfile', 'Procfile'
 ];
+
+const knownFilenames = [
+    '.babelrc', '.eslintrc', '.prettierrc', 'package.json', 'tsconfig.json', 'gemfile', 'rakefile'
+];
+
+const isTextFile = (fileName: string) => {
+    const lowerFileName = fileName.toLowerCase();
+    if (knownFilenames.includes(lowerFileName)) return true;
+    return textFileExtensions.some(ext => lowerFileName.endsWith(ext));
+};
+
 
 async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, path: string = ''): Promise<{ path: string, content?: string, type: 'file' | 'dir' }[]> {
     try {
@@ -15,7 +26,7 @@ async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, 
         const contents = response.data;
 
         if (!Array.isArray(contents)) {
-            if (contents.type === 'file' && contents.content) {
+            if (contents.type === 'file' && contents.content && isTextFile(contents.name)) {
                 return [{ 
                     path: contents.path, 
                     content: Buffer.from(contents.content, 'base64').toString('utf-8'),
@@ -31,12 +42,17 @@ async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, 
                 items.push({ path: item.path, type: 'dir' });
                 const subItems = await fetchRepoContents(octokit, owner, repo, item.path);
                 items.push(...subItems);
-            } else if (item.type === 'file' && item.download_url && textFileExtensions.some(ext => item.name.endsWith(ext) || item.name.toLowerCase().includes(ext.slice(1)))) {
+            } else if (item.type === 'file' && item.download_url && isTextFile(item.name)) {
                  try {
-                    const fileResponse = await fetch(item.download_url);
-                    if(fileResponse.ok) {
-                        const content = await fileResponse.text();
-                        items.push({ path: item.path, content, type: 'file' });
+                    // Only fetch content for reasonably sized text files to avoid memory issues
+                    if (item.size < 1000000) { // 1MB limit
+                        const fileResponse = await fetch(item.download_url);
+                        if(fileResponse.ok) {
+                            const content = await fileResponse.text();
+                            items.push({ path: item.path, content, type: 'file' });
+                        }
+                    } else {
+                        console.warn(`Skipping large file: ${item.path}`);
                     }
                 } catch (e) {
                     console.warn(`Skipping file ${item.path} due to fetch error.`);

@@ -15,21 +15,10 @@ import { useFileSystem } from "@/hooks/use-file-system";
 
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
 
-const getChildrenOfPath = (allFiles: FileType[], path: string): FileType[] => {
-    if (path === '/') {
-        return allFiles.filter(f => !f.parentId);
-    }
-    const parent = findNodeByPath(allFiles, path);
-    if (parent && parent.isFolder) {
-        return allFiles.filter(f => f.parentId === parent._id);
-    }
-    return [];
-};
-
 const findNodeByPath = (allFiles: FileType[], path: string): FileType | null => {
     if (path === '/') {
         // This is a virtual root, not a real file object
-        return { _id: 'root', name: '/', isFolder: true, children: allFiles.filter(f => !f.parentId) } as any;
+        return { _id: 'root', name: '/', isFolder: true, content: '', parentId: null, language: '', isOpen: false, isActive: false, createdAt: new Date(), updatedAt: new Date(), children: allFiles.filter(f => !f.parentId) };
     }
     
     const parts = path.split('/').filter(Boolean);
@@ -50,6 +39,11 @@ const findNodeByPath = (allFiles: FileType[], path: string): FileType | null => 
         }
     }
     return currentNode;
+};
+
+const getChildrenOfPath = (allFiles: FileType[], path: string): FileType[] => {
+    const parent = findNodeByPath(allFiles, path);
+    return parent?.children || [];
 };
 
 // Create a set of runner commands from the language config for efficient lookup
@@ -189,9 +183,10 @@ export function Terminal({
                 term.writeln('\r\ncat: missing operand');
                 break;
             }
-            const fileChildren = getChildrenOfPath(allFiles, currentPath);
-            const fileToRead = fileChildren.find(f => f.name === filename && !f.isFolder);
-            if (fileToRead) {
+            const catPath = filename.startsWith('/') ? filename : `${currentPath === '/' ? '' : currentPath}/${filename}`;
+            const fileToRead = findNodeByPath(allFiles, catPath);
+
+            if (fileToRead && !fileToRead.isFolder) {
                 term.writeln(`\r\n${fileToRead.content.replace(/\n/g, '\r\n')}`);
             } else {
                 term.writeln(`\r\ncat: ${filename}: No such file`);
@@ -253,10 +248,10 @@ export function Terminal({
             }
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
-            if (historyIndex > -1) {
+            if (historyIndex > 0) {
                 const newIndex = historyIndex - 1;
                 setHistoryIndex(newIndex);
-                const cmd = commandHistory[newIndex] || '';
+                const cmd = commandHistory[newIndex];
                 xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
                 setCurrentLine(cmd);
             } else {

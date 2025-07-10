@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -25,28 +26,29 @@ export default function EditorFilePage() {
   const file = findFile(fileId);
 
   useEffect(() => {
-    if (fileId) {
-      setActiveFileId(fileId);
+    if (fileId && file) {
+      if (file.isFolder) {
+        toast.error("Cannot open a folder in the editor.");
+        router.replace('/editor');
+      } else {
+        setActiveFileId(fileId);
+      }
     }
-  }, [fileId, setActiveFileId]);
-
-  useEffect(() => {
-    if (!fsLoading && file?.isFolder) {
-      toast.error("Cannot open a folder in the editor.");
-      router.replace('/editor');
-    }
-  }, [file, fsLoading, router]);
+  }, [fileId, file, setActiveFileId, router]);
 
   if (fsLoading) {
     return <LoadingSpinner />;
   }
   
   if (!file) {
-    return (
-        <div className="flex items-center justify-center h-full bg-background">
-            <p className="text-lg text-destructive">File not found.</p>
-        </div>
-    );
+    // This can happen briefly on first load or if the fileId is invalid.
+    // The parent layout will redirect if the user isn't logged in.
+    return <LoadingSpinner />;
+  }
+  
+  if (file.isFolder) {
+    // This case is handled by the useEffect above, but as a safeguard:
+    return null;
   }
 
   return <Editor initialFile={file} />;
