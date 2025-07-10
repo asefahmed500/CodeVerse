@@ -279,14 +279,19 @@ export function Terminal({
     const resizeObserver = new ResizeObserver((entries) => {
         if (entries[0]?.contentRect.width > 0 && fitAddon.current) {
             try {
+                // This is the robust way to fit the terminal.
+                // It will only run when the container is visible and has a size.
                 fitAddon.current.fit();
             } catch (e) {
+                // This catch block prevents rare race conditions from crashing the app.
                 console.warn("Minor terminal resize error caught and ignored:", e);
             }
         }
     });
     
-    resizeObserver.observe(terminalRef.current);
+    if (terminalRef.current) {
+        resizeObserver.observe(terminalRef.current);
+    }
     
     return () => {
       resizeObserver.disconnect();
