@@ -12,6 +12,7 @@ import { useTerminalStore } from "@/hooks/use-terminal-store";
 import { executeCode } from "@/lib/code-runner";
 import { LANGUAGE_CONFIG, getLanguageConfigFromFilename } from "@/config/languages";
 import { useFileSystem } from "@/hooks/use-file-system";
+import { useTerminalManager } from "@/hooks/use-terminal-manager-store";
 
 const prompt = (path: string) => `\r\n\x1b[1;34m${path}\x1b[0m $ `;
 
@@ -58,7 +59,6 @@ const findNodeByPath = (allFiles: FileType[], currentPath: string, targetPath: s
     return currentNode;
 };
 
-// Create a set of runner commands from the language config for efficient lookup
 const runnerCommands = new Set(
     Object.values(LANGUAGE_CONFIG)
         .map(lang => lang.runner)
@@ -77,6 +77,7 @@ export function Terminal({
   const xterm = useRef<XTerminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const { theme } = useTheme();
+  const { activeTerminalId } = useTerminalManager();
   const { commandToRun, commandProcessed, outputToAppend, outputAppended } = useTerminalStore();
   const { allFiles } = useFileSystem();
 
@@ -223,19 +224,6 @@ export function Terminal({
         fontFamily: "'Source Code Pro', monospace",
         fontSize: 14,
         allowProposedApi: true,
-        theme: theme === 'dark' ? {
-            background: "hsl(var(--background))",
-            foreground: "hsl(var(--foreground))",
-            cursor: "hsl(var(--foreground))",
-            selectionBackground: "hsl(var(--accent))",
-            selectionForeground: "hsl(var(--accent-foreground))"
-        } : {
-            background: "hsl(var(--background))",
-            foreground: "hsl(var(--foreground))",
-            cursor: "hsl(var(--foreground))",
-            selectionBackground: "hsl(var(--accent))",
-            selectionForeground: "hsl(var(--accent-foreground))"
-        }
     });
     xterm.current = term;
     
@@ -288,42 +276,40 @@ export function Terminal({
     term.writeln('Welcome to CodeVerse Terminal!');
     term.writeln("Type 'help' for a list of available commands.");
     term.write(prompt(currentPath));
-    
-    const resizeObserver = new ResizeObserver((entries) => {
-        if (entries[0]?.contentRect.width > 0 && fitAddon.current && xterm.current) {
-            try {
-                fitAddon.current.fit();
-            } catch (e) {
-                // This can still fire in odd edge cases, so we just ignore it.
-            }
-        }
-    });
-    
-    if (terminalRef.current) {
-        resizeObserver.observe(terminalRef.current);
-    }
-    
+
     return () => {
-      resizeObserver.disconnect();
       term.dispose();
       xterm.current = null;
     };
   }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
+      // This effect is crucial. It runs when this terminal becomes active.
+      // We check if the addon is ready and the container div has a clientWidth
+      // to avoid the 'dimensions' crash.
+      if (activeTerminalId === terminal._id && fitAddon.current && terminalRef.current?.clientWidth > 0) {
+        try {
+            fitAddon.current.fit();
+        } catch(e) {
+            // Ignore potential errors during fitting
+        }
+      }
+  }, [activeTerminalId, terminal._id]);
+
+  useEffect(() => {
     if (xterm.current) {
         xterm.current.options.theme = theme === 'dark' ? {
-            background: "hsl(var(--background))",
-            foreground: "hsl(var(--foreground))",
-            cursor: "hsl(var(--foreground))",
-            selectionBackground: "hsl(var(--accent))",
-            selectionForeground: "hsl(var(--accent-foreground))"
+            background: "#2C3333", // Dark Slate Gray
+            foreground: "#FFFFFF",
+            cursor: "#FFFFFF",
+            selectionBackground: "#00FFFF", // Cyan
+            selectionForeground: "#000000",
         } : {
-            background: "hsl(var(--background))",
-            foreground: "hsl(var(--foreground))",
-            cursor: "hsl(var(--foreground))",
-            selectionBackground: "hsl(var(--accent))",
-            selectionForeground: "hsl(var(--accent-foreground))"
+            background: "#FFFFFF",
+            foreground: "#000000",
+            cursor: "#000000",
+            selectionBackground: "#ADD8E6", // Light Blue
+            selectionForeground: "#000000",
         };
     }
   }, [theme]);
@@ -337,7 +323,7 @@ export function Terminal({
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
   
   useEffect(() => {
-    if (outputToAppend && xterm.current) {
+    if (outputToAppend?.id && xterm.current) {
         xterm.current.write(outputToAppend.content);
         xterm.current.write(prompt(currentPath));
         outputAppended();
