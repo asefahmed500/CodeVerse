@@ -15,7 +15,8 @@ export function EditorTabs() {
   const openFiles = useMemo(() => {
     return allFiles
       .filter(f => !f.isFolder && f.isOpen)
-      .sort((a, b) => (a.updatedAt > b.updatedAt ? -1 : 1))
+      // Sort by most recently updated to keep the tab order stable but recent
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [allFiles])
 
   const handleCloseTab = (e: React.MouseEvent, fileToClose: FileType) => {
@@ -24,11 +25,16 @@ export function EditorTabs() {
     const remainingOpenFiles = openFiles.filter(f => f._id !== fileToClose._id);
     let newActiveFileId: string | null = null;
     
+    // If we're closing the active tab, we need to decide which tab to activate next.
     if (activeFileId === fileToClose._id) {
         if (remainingOpenFiles.length > 0) {
+            // A good default is the most recently used file among the remaining open ones.
+            // Since `openFiles` is already sorted by `updatedAt` desc, the first one is the best candidate.
             newActiveFileId = remainingOpenFiles[0]._id;
         }
+        // If no other files are open, newActiveFileId remains null, and we go to the welcome screen.
     } else {
+        // If we're closing a background tab, the active tab doesn't change.
         newActiveFileId = activeFileId;
     }
 
