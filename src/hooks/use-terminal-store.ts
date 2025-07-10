@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from "zustand";
@@ -10,7 +11,7 @@ interface TerminalState {
   outputAppended: () => void;
 
   // For interactive shell commands
-  commandToRun: string | null;
+  commandToRun: { id: string; command: string } | null;
   runCommand: (command: string) => void;
   commandProcessed: () => void;
 }
@@ -21,6 +22,6 @@ export const useTerminalStore = create<TerminalState>((set) => ({
   outputAppended: () => set({ outputToAppend: null }),
   
   commandToRun: null,
-  runCommand: (command) => set({ commandToRun: command }),
+  runCommand: (command) => set({ commandToRun: { id: uuidv4(), command } }),
   commandProcessed: () => set({ commandToRun: null }),
 }));

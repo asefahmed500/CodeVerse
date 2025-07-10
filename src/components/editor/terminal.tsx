@@ -223,6 +223,19 @@ export function Terminal({
         fontFamily: "'Source Code Pro', monospace",
         fontSize: 14,
         allowProposedApi: true,
+        theme: theme === 'dark' ? {
+            background: "hsl(var(--background))",
+            foreground: "hsl(var(--foreground))",
+            cursor: "hsl(var(--foreground))",
+            selectionBackground: "hsl(var(--accent))",
+            selectionForeground: "hsl(var(--accent-foreground))"
+        } : {
+            background: "hsl(var(--background))",
+            foreground: "hsl(var(--foreground))",
+            cursor: "hsl(var(--foreground))",
+            selectionBackground: "hsl(var(--accent))",
+            selectionForeground: "hsl(var(--accent-foreground))"
+        }
     });
     xterm.current = term;
     
@@ -277,11 +290,11 @@ export function Terminal({
     term.write(prompt(currentPath));
     
     const resizeObserver = new ResizeObserver((entries) => {
-        if (entries[0]?.contentRect.width > 0 && fitAddon.current) {
+        if (entries[0]?.contentRect.width > 0 && fitAddon.current && xterm.current) {
             try {
                 fitAddon.current.fit();
             } catch (e) {
-                console.warn("Minor terminal resize error caught and ignored:", e);
+                // This can still fire in odd edge cases, so we just ignore it.
             }
         }
     });
@@ -326,11 +339,7 @@ export function Terminal({
   useEffect(() => {
     if (outputToAppend && xterm.current) {
         xterm.current.write(outputToAppend.content);
-        if (xterm.current.buffer.active.cursorX === 0) {
-            xterm.current.write(prompt(currentPath));
-        } else {
-            xterm.current.write(prompt(currentPath));
-        }
+        xterm.current.write(prompt(currentPath));
         outputAppended();
     }
   }, [outputToAppend, outputAppended, currentPath]);
