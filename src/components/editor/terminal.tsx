@@ -278,13 +278,12 @@ export function Terminal({
         term.write(prompt(currentPath));
     }
 
-    // Set up ResizeObserver to handle fitting
     const resizeObserver = new ResizeObserver(() => {
         if(terminalRef.current && terminalRef.current.clientWidth > 0 && fitAddon.current) {
             try {
                 fitAddon.current.fit();
             } catch(e) {
-                 // Can safely ignore fit errors on rapid resize
+                 // This can happen during rapid resize, safe to ignore.
             }
         }
     });
@@ -297,13 +296,18 @@ export function Terminal({
       if (terminalRef.current) {
         resizeObserver.unobserve(terminalRef.current);
       }
-      if (xterm.current) {
-        // Only dispose if it's truly the last unmount
-        // xterm.current.dispose();
-        // xterm.current = null;
-      }
     };
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
+
+  useEffect(() => {
+    if (activeTerminalId === terminal._id && fitAddon.current) {
+        if (terminalRef.current && terminalRef.current.clientWidth > 0) {
+           try {
+                fitAddon.current.fit();
+            } catch(e) {}
+        }
+    }
+  }, [activeTerminalId, terminal._id]);
 
   useEffect(() => {
     // This effect handles theme changes.

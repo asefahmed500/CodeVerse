@@ -15,8 +15,6 @@ export function useCodeRunner() {
   const { setActiveTerminalId, terminals } = useTerminalManager();
 
   const runActiveFile = async () => {
-    // This is the critical change: get the state directly here
-    // to ensure it's the most up-to-date version.
     const activeFileId = useFileSystem.getState().activeFileId;
     const activeFile = activeFileId ? useFileSystem.getState().findFile(activeFileId) : null;
     
@@ -47,7 +45,6 @@ export function useCodeRunner() {
         return;
     }
 
-    // Ensure the terminal panel is visible and active
     if(terminals.length > 0) setActiveTerminalId(terminals[0]._id);
     openView('terminal');
     
