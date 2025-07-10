@@ -42,7 +42,6 @@ export async function GET(request: Request) {
             _id: file._id.toString(),
             userId: file.userId.toString(),
             parentId: file.parentId ? file.parentId.toString() : null,
-            // Client-side state is added by the hook, not sent from the server.
         }));
         
         return NextResponse.json(sanitizedFiles);
@@ -227,7 +226,20 @@ export async function PUT(request: Request) {
         if (!updatedFile) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
-        return NextResponse.json({ ...updatedFile, _id: updatedFile._id.toString(), parentId: updatedFile.parentId?.toString() || null });
+        
+        // Return a minimal object to avoid overwriting client-side state
+        const responseData = {
+          _id: updatedFile._id.toString(),
+          parentId: updatedFile.parentId?.toString() || null,
+          name: updatedFile.name,
+          content: updatedFile.content,
+          isFolder: updatedFile.isFolder,
+          language: updatedFile.language,
+          createdAt: updatedFile.createdAt,
+          updatedAt: updatedFile.updatedAt
+        };
+
+        return NextResponse.json(responseData);
     } catch (error) {
         console.error("PUT /api/files Error:", error);
         if (error instanceof mongoose.Error.ValidationError) {

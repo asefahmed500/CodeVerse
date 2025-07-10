@@ -94,7 +94,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const tree = buildFileTree(flatFiles);
             set({
                 files: tree,
-                allFiles: flatFiles,
+                allFiles: flatFiles.map(f => ({...f, isOpen: false, isActive: false })),
                 loading: false,
                 dirtyFileIds: [],
             });
@@ -150,7 +150,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const createdFile: FileType = await res.json();
             
             set(produce((state: FileSystemState) => {
-              state.allFiles.push(createdFile);
+              state.allFiles.push({ ...createdFile, isOpen: false, isActive: false });
               state.files = buildFileTree(state.allFiles);
             }));
             
@@ -165,7 +165,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
     createFolder: async (name: string, parentId: string | null = null) => {
         const newFolderPayload = {
-            name, content: '', isFolder: true, parentId, children: [],
+            name, content: '', isFolder: true, parentId,
             language: 'plaintext',
         };
 
@@ -184,7 +184,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const newFolder: FileType = await res.json();
             
             set(produce((state: FileSystemState) => {
-                state.allFiles.push({ ...newFolder, children: [] });
+                state.allFiles.push({ ...newFolder, children: [], isOpen: false, isActive: false });
                 state.files = buildFileTree(state.allFiles);
                 if (parentId && !state.expandedFolders.includes(parentId!)) {
                     state.expandedFolders.push(parentId!);
@@ -241,6 +241,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             set(produce((state: FileSystemState) => {
                 const fileIndex = state.allFiles.findIndex(f => f._id === fileId);
                 if (fileIndex !== -1) {
+                    // Only update fields returned from API, preserve local state like isOpen
                     state.allFiles[fileIndex] = { ...state.allFiles[fileIndex], ...updatedFile };
                 }
                 if(nameChanged) {
@@ -284,22 +285,25 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             let nextActiveFileId: string | null = get().activeFileId;
 
             set(produce((state: FileSystemState) => {
-                const originalActiveId = state.activeFileId;
+                const wasActiveFileDeleted = deletedIds.includes(state.activeFileId);
+                
                 state.allFiles = state.allFiles.filter(f => !deletedIds.includes(f._id));
 
-                if (originalActiveId && deletedIds.includes(originalActiveId)) {
-                    const openFiles = state.allFiles.filter(f => !f.isFolder && f.isOpen && !deletedIds.includes(f._id));
+                if (wasActiveFileDeleted) {
+                    const openFiles = state.allFiles.filter(f => f.isOpen && !f.isFolder);
                     openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-                    const newActiveFile = openFiles[0] ?? null;
-                    state.activeFileId = newActiveFile?._id ?? null;
-                    
-                    state.allFiles.forEach(f => {
-                       f.isActive = f._id === state.activeFileId;
-                    });
+                    nextActiveFileId = openFiles.length > 0 ? openFiles[0]._id : null;
+                } else {
+                    nextActiveFileId = state.activeFileId;
                 }
                 
-                nextActiveFileId = state.activeFileId;
+                state.activeFileId = nextActiveFileId;
+                state.allFiles.forEach(f => {
+                    f.isActive = f._id === nextActiveFileId;
+                });
+                
                 state.files = buildFileTree(state.allFiles);
+                state.dirtyFileIds = state.dirtyFileIds.filter(id => !deletedIds.includes(id));
             }));
 
             toast.success(`Deleted ${fileToDelete.name}.`, { id: toastId });
@@ -330,7 +334,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             const duplicatedItem: FileType = await res.json();
             
             const flattenChildren = (node: FileType): FileType[] => {
-                let flat: FileType[] = [{...node, children: undefined}];
+                let flat: FileType[] = [{...node, children: undefined, isOpen: false, isActive: false }];
                 if (node.children) {
                     node.children.forEach(child => {
                         flat.push(...flattenChildren(child));
@@ -358,7 +362,6 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
             const fileMap = new Map(state.allFiles.map(f => [f._id, f]));
             
-            // Expand parent folders if a file is activated
             const ancestors = new Set<string>();
             let currentFile = fileId ? fileMap.get(fileId) : null;
             if (currentFile?.parentId) {
@@ -380,8 +383,8 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 }
             });
             state.activeFileId = fileId;
-            // Rebuild tree only if folder expansion changed
-            if (ancestors.size > 0) {
+            // Rebuild tree if folder expansion changed
+            if (ancestors.size > 0 && state.files.length > 0) {
                 state.files = buildFileTree(state.allFiles);
             }
         }));
@@ -498,7 +501,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             
             set({ 
                 files: tree, 
-                allFiles: createdFiles, 
+                allFiles: createdFiles.map(f => ({...f, isOpen: false, isActive: false })), 
                 dirtyFileIds: [], 
                 expandedFolders: newFolderIds 
             });
