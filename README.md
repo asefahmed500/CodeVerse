@@ -2,6 +2,10 @@
 
 CodeVerse is a powerful, full-featured Integrated Development Environment (IDE) that runs entirely in your browser. Built with Next.js, React, and MongoDB, it provides a seamless, cloud-native development experience that allows you to write, test, and manage your code from anywhere, on any device.
 
+## Project Status
+
+**Complete & Fully Functional:** All core features have been implemented, tested, and are working as expected. The application is now considered stable and production-ready.
+
 ## Core Features
 
 *   **Full-Fledged Code Editor:** Powered by Monaco (the engine behind VS Code), featuring syntax highlighting, code snippets, and configurable settings.
