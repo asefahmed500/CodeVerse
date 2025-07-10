@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -110,7 +111,7 @@ export function MainMenuBar() {
       <MenubarMenu>
         <MenubarTrigger className="h-full px-2">Terminal</MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onSelect={() => openView('terminal')}>Show Terminal</MenubarItem>
+          <MenubarItem onSelect={() => openView('terminal')}>New Terminal</MenubarItem>
         </MenubarContent>
       </MenubarMenu>
     </Menubar>

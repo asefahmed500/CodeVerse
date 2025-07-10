@@ -41,11 +41,6 @@ const findNodeByPath = (allFiles: FileType[], path: string): FileType | null => 
     return currentNode;
 };
 
-const getChildrenOfPath = (allFiles: FileType[], path: string): FileType[] => {
-    const parent = findNodeByPath(allFiles, path);
-    return parent?.children || [];
-};
-
 // Create a set of runner commands from the language config for efficient lookup
 const runnerCommands = new Set(
     Object.values(LANGUAGE_CONFIG)
@@ -150,7 +145,7 @@ export function Terminal({
             term.writeln(`  ${runners} [file]`);
             break;
         case 'ls':
-            const children = getChildrenOfPath(allFiles, currentPath);
+            const children = findNodeByPath(allFiles, currentPath)?.children || [];
             if (children.length === 0) {
                 term.writeln('\r\n(empty)');
             } else {

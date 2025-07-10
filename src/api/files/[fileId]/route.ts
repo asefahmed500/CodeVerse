@@ -28,12 +28,12 @@ export async function GET(
       return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
     }
 
+    // This is a minimal response used for fetching single file content.
+    // The client-side state is the source of truth for UI properties.
     const fileJSON = {
       ...file,
       _id: file._id.toString(),
       parentId: file.parentId ? file.parentId.toString() : null,
-      isOpen: false, 
-      isActive: false, 
     };
 
     return NextResponse.json(fileJSON);

@@ -2,7 +2,7 @@
 "use client";
 
 import { ChevronRight, FolderPlus, FilePlus, Copy, X, Pencil, Folder, Search } from "lucide-react";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useFileSystem } from "@/hooks/use-file-system";
 import { useRouter } from "next/navigation";
 import type { FileType } from "@/types";
@@ -33,7 +33,7 @@ function CreationInput({
   onComplete: (name: string) => void;
 }) {
   const [name, setName] = useState('');
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -278,11 +278,15 @@ function FileTreeItem({
   }
   
   const handleNewFile = () => {
-    onStartCreation('file', file._id);
+    if (file.isFolder) {
+      onStartCreation('file', file._id);
+    }
   }
   
   const handleNewFolder = () => {
-    onStartCreation('folder', file._id);
+    if (file.isFolder) {
+      onStartCreation('folder', file._id);
+    }
   }
 
   const handleDelete = async () => {

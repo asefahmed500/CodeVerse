@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import dbConnect from "@/lib/db";
 import File from "@/models/file";
-import type { FileType } from "@/types";
+import type { IFile } from "@/models/file";
 import mongoose from "mongoose";
 
 const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string): Promise<mongoose.Types.ObjectId[]> => {
@@ -12,7 +12,8 @@ const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string):
     
     while(queue.length > 0) {
         const currentId = queue.shift()!;
-        const children = await File.find({ parentId: currentId, userId }, '_id isFolder'); // Optimize projection
+        // Optimize projection to only get necessary fields
+        const children = await File.find({ parentId: currentId, userId }, '_id isFolder');
         for (const child of children) {
             descendants.push(child._id);
             if (child.isFolder) {
@@ -35,13 +36,13 @@ export async function GET(request: Request) {
         await dbConnect();
         const files = await File.find({ userId }).lean();
         
+        // Sanitize files for client consumption, converting ObjectIDs to strings
         const sanitizedFiles = files.map(file => ({
             ...file,
             _id: file._id.toString(),
             userId: file.userId.toString(),
             parentId: file.parentId ? file.parentId.toString() : null,
-            isOpen: false,
-            isActive: false,
+            // Client-side state is added by the hook, not sent from the server.
         }));
         
         return NextResponse.json(sanitizedFiles);
@@ -142,11 +143,13 @@ export async function POST(request: Request) {
 
         if (action === 'bulkCreate') {
             const { items } = await request.json(); 
+            // Clear existing workspace before cloning a new one
             await File.deleteMany({ userId });
             
             const createdItems = [];
             const pathIdMap = new Map<string, string>();
-            items.sort((a: any, b: any) => a.path.localeCompare(b.path)); 
+            // Sort by path depth to ensure parents are created before children
+            items.sort((a: any, b: any) => a.path.split('/').length - b.path.split('/').length); 
 
             for (const item of items) {
                 const parts = item.path.split('/');
@@ -158,7 +161,7 @@ export async function POST(request: Request) {
                     ...item,
                     name: itemName,
                     userId,
-                    parentId,
+                    parentId: parentId ? new mongoose.Types.ObjectId(parentId) : null,
                 });
                 const savedItem = await newItem.save();
                 const savedObject = savedItem.toObject();
@@ -171,6 +174,7 @@ export async function POST(request: Request) {
             return NextResponse.json(createdItems, { status: 201 });
         }
         
+        // Default action: Create a single file/folder
         const fileData = await request.json();
         const newFile = new File({
             ...fileData,
@@ -205,11 +209,12 @@ export async function PUT(request: Request) {
     try {
         await dbConnect();
         const updates = await request.json();
-        // Prevent client from updating internal state fields
+        // Prevent client from updating internal/protected fields
         delete updates.isOpen;
         delete updates.isActive;
         delete updates.children;
         delete updates._id;
+        delete updates.userId;
 
         updates.updatedAt = new Date();
 
