@@ -65,7 +65,7 @@ interface FileSystemState {
   deleteFile: (fileId: string) => Promise<{ nextActiveFileId: string | null }>;
   duplicateFileOrFolder: (fileId: string) => Promise<void>;
   setActiveFileId: (fileId: string | null) => void;
-  closeFile: (fileId: string) => void;
+  closeFile: (fileId: string, newActiveFileId: string | null) => void;
   toggleFolder: (folderId: string) => void;
   searchFiles: (query: string) => Promise<SearchResult[]>;
   replaceInFiles: (query: string, replaceWith: string) => Promise<void>;
@@ -380,12 +380,16 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
         }));
     },
     
-    closeFile: (fileId: string) => {
+    closeFile: (fileId, newActiveFileId) => {
       set(produce((state: FileSystemState) => {
           const fileToClose = state.allFiles.find(f => f._id === fileId);
           if (fileToClose) {
               fileToClose.isOpen = false;
           }
+          state.activeFileId = newActiveFileId;
+          state.allFiles.forEach(f => {
+            f.isActive = f._id === newActiveFileId;
+          });
       }));
     },
 

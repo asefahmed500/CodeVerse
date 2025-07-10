@@ -9,7 +9,7 @@ import { FileIcon } from './file-icon'
 import { Button } from '../ui/button'
 
 export function EditorTabs() {
-  const { files, allFiles, closeFile, activeFileId, setActiveFileId } = useFileSystem()
+  const { allFiles, closeFile, activeFileId, setActiveFileId } = useFileSystem()
   const router = useRouter()
 
   const openFiles = useMemo(() => {
@@ -22,17 +22,22 @@ export function EditorTabs() {
     e.stopPropagation()
 
     const remainingOpenFiles = openFiles.filter(f => f._id !== fileToClose._id);
-    closeFile(fileToClose._id);
-
+    let newActiveFileId: string | null = null;
+    
     if (activeFileId === fileToClose._id) {
-      if (remainingOpenFiles.length > 0) {
-        const newActiveFile = remainingOpenFiles[0];
-        setActiveFileId(newActiveFile._id)
-        router.push(`/editor/${newActiveFile._id}`);
-      } else {
-        setActiveFileId(null);
+        if (remainingOpenFiles.length > 0) {
+            newActiveFileId = remainingOpenFiles[0]._id;
+        }
+    } else {
+        newActiveFileId = activeFileId;
+    }
+
+    closeFile(fileToClose._id, newActiveFileId);
+
+    if (newActiveFileId) {
+        router.push(`/editor/${newActiveFileId}`);
+    } else {
         router.push('/editor');
-      }
     }
   }
   
