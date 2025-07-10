@@ -218,27 +218,27 @@ export function Terminal({
   useEffect(() => {
     if (!terminalRef.current || xterm.current) return;
     
-    xterm.current = new XTerminal({
+    const term = new XTerminal({
         cursorBlink: true,
         fontFamily: "'Source Code Pro', monospace",
         fontSize: 14,
         allowProposedApi: true,
     });
+    xterm.current = term;
     
-    fitAddon.current = new FitAddon();
-    xterm.current.loadAddon(fitAddon.current);
-    xterm.current.open(terminalRef.current);
+    const addon = new FitAddon();
+    fitAddon.current = addon;
+    term.loadAddon(addon);
+    term.open(terminalRef.current);
     
-    xterm.current.onKey(({ key, domEvent: e }) => {
-        if (!xterm.current) return;
-        
+    term.onKey(({ key, domEvent: e }) => {
         if (e.key === 'Enter') {
             executeCommand(currentLine);
             setCurrentLine('');
             setHistoryIndex(-1);
         } else if (e.key === 'Backspace') {
             if (currentLine.length > 0) {
-                xterm.current.write('\b \b');
+                term.write('\b \b');
                 setCurrentLine(currentLine.slice(0, -1));
             }
         } else if (e.key === 'ArrowUp') {
@@ -247,7 +247,7 @@ export function Terminal({
                 const newIndex = historyIndex + 1;
                 setHistoryIndex(newIndex);
                 const cmd = commandHistory[newIndex];
-                xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                term.write('\x1b[2K\r' + prompt(currentPath) + cmd);
                 setCurrentLine(cmd);
             }
         } else if (e.key === 'ArrowDown') {
@@ -256,54 +256,44 @@ export function Terminal({
                 const newIndex = historyIndex - 1;
                 setHistoryIndex(newIndex);
                 const cmd = commandHistory[newIndex];
-                xterm.current.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                term.write('\x1b[2K\r' + prompt(currentPath) + cmd);
                 setCurrentLine(cmd);
             } else {
                  setHistoryIndex(-1);
-                 xterm.current.write('\x1b[2K\r' + prompt(currentPath));
+                 term.write('\x1b[2K\r' + prompt(currentPath));
                  setCurrentLine('');
             }
         }
         else if (!e.ctrlKey && !e.altKey && !e.metaKey) {
              if (key >= String.fromCharCode(0x20) && key <= String.fromCharCode(0x7e) || key.length > 1) {
                 setCurrentLine(currentLine + key);
-                xterm.current.write(key);
+                term.write(key);
             }
         }
     });
 
-    xterm.current.writeln('Welcome to CodeVerse Terminal!');
-    xterm.current.writeln("Type 'help' for a list of available commands.");
-    xterm.current.write(prompt(currentPath));
+    term.writeln('Welcome to CodeVerse Terminal!');
+    term.writeln("Type 'help' for a list of available commands.");
+    term.write(prompt(currentPath));
     
     const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-          try {
-              if (fitAddon.current && xterm.current) {
-                // This check ensures we don't try to fit if terminal isn't fully ready
-                if (xterm.current.element && xterm.current.element.clientWidth > 0) {
-                    fitAddon.current.fit();
-                }
-              }
-          } catch (e) {
-              // This catch can prevent the rare "Cannot read properties of undefined (reading 'dimensions')"
-              // if a resize happens at an awkward time.
-              console.warn("Minor terminal resize error caught and ignored:", e);
-          }
-      }
+        if (entries[0]?.contentRect.width > 0 && fitAddon.current) {
+            try {
+                fitAddon.current.fit();
+            } catch (e) {
+                console.warn("Minor terminal resize error caught and ignored:", e);
+            }
+        }
     });
     
-    if (terminalRef.current) {
-      resizeObserver.observe(terminalRef.current);
-    }
+    resizeObserver.observe(terminalRef.current);
     
     return () => {
       resizeObserver.disconnect();
-      xterm.current?.dispose();
+      term.dispose();
       xterm.current = null;
     };
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
     if (xterm.current) {
@@ -323,7 +313,6 @@ export function Terminal({
     }
   }, [theme]);
   
-  // This hook handles commands sent from the interactive shell simulation
   useEffect(() => {
     if (commandToRun && xterm.current) {
       xterm.current.write(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun}\x1b[0m`);
@@ -332,7 +321,6 @@ export function Terminal({
     }
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
   
-  // This hook handles direct output injection from the code runner
   useEffect(() => {
     if (outputToAppend && xterm.current) {
         xterm.current.write(outputToAppend.content);

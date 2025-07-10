@@ -1,3 +1,4 @@
+
 import { useFileSystem } from '@/hooks/use-file-system';
 import { useTerminalStore } from '@/hooks/use-terminal-store';
 import { useActiveView } from '@/hooks/use-active-view';
@@ -14,7 +15,6 @@ export function useCodeRunner() {
   const { setActiveTerminalId, terminals } = useTerminalManager();
 
   const runActiveFile = async () => {
-    // Get the fresh state directly from the store inside the handler
     const activeFileId = useFileSystem.getState().activeFileId;
     const activeFile = activeFileId ? useFileSystem.getState().findFile(activeFileId) : null;
     
