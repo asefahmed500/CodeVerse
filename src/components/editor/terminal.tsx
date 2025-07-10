@@ -345,3 +345,5 @@ export function Terminal({
     <div ref={terminalRef} className="h-full w-full p-2" />
   );
 }
+
+    
