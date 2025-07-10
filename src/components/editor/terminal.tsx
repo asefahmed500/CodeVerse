@@ -279,11 +279,8 @@ export function Terminal({
     const resizeObserver = new ResizeObserver((entries) => {
         if (entries[0]?.contentRect.width > 0 && fitAddon.current) {
             try {
-                // This is the robust way to fit the terminal.
-                // It will only run when the container is visible and has a size.
                 fitAddon.current.fit();
             } catch (e) {
-                // This catch block prevents rare race conditions from crashing the app.
                 console.warn("Minor terminal resize error caught and ignored:", e);
             }
         }
@@ -329,7 +326,11 @@ export function Terminal({
   useEffect(() => {
     if (outputToAppend && xterm.current) {
         xterm.current.write(outputToAppend.content);
-        xterm.current.write(prompt(currentPath));
+        if (xterm.current.buffer.active.cursorX === 0) {
+            xterm.current.write(prompt(currentPath));
+        } else {
+            xterm.current.write(prompt(currentPath));
+        }
         outputAppended();
     }
   }, [outputToAppend, outputAppended, currentPath]);
@@ -345,5 +346,3 @@ export function Terminal({
     <div ref={terminalRef} className="h-full w-full p-2" />
   );
 }
-
-    
