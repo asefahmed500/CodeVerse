@@ -276,8 +276,17 @@ export function Terminal({
     xterm.current.writeln("Type 'help' for a list of available commands.");
     xterm.current.write(prompt(currentPath));
     
-    fitAddon.current?.fit();
-    const resizeObserver = new ResizeObserver(() => fitAddon.current?.fit());
+    // Initial fit
+    if (terminalRef.current.clientHeight > 0) {
+        fitAddon.current?.fit();
+    }
+    
+    const resizeObserver = new ResizeObserver(() => {
+        // Only fit if the terminal is actually visible and has a size
+        if (terminalRef.current && terminalRef.current.clientHeight > 0) {
+            fitAddon.current?.fit();
+        }
+    });
     resizeObserver.observe(terminalRef.current);
     
     return () => {

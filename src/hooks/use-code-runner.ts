@@ -9,12 +9,14 @@ import { useProblemsStore } from './use-problems-store';
 import type { Problem } from '@/types';
 
 export function useCodeRunner() {
-  const { activeFile } = useFileSystem();
   const { appendOutput } = useTerminalStore();
   const { openView } = useActiveView();
   const { setActiveTerminalId, terminals } = useTerminalManager();
 
   const runActiveFile = async () => {
+    // Get the fresh state directly from the store inside the handler
+    const activeFile = useFileSystem.getState().activeFile;
+    
     if (!activeFile || activeFile.isFolder) {
         toast.error("No runnable file selected.");
         return;
