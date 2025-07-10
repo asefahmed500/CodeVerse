@@ -217,76 +217,97 @@ export function Terminal({
 
 
   useEffect(() => {
-    if (!terminalRef.current || xterm.current) return;
-    
-    const term = new XTerminal({
-        cursorBlink: true,
-        fontFamily: "'Source Code Pro', monospace",
-        fontSize: 14,
-        allowProposedApi: true,
-    });
-    xterm.current = term;
-    
-    const addon = new FitAddon();
-    fitAddon.current = addon;
-    term.loadAddon(addon);
-    term.open(terminalRef.current);
-    
-    term.onKey(({ key, domEvent: e }) => {
-        if (e.key === 'Enter') {
-            executeCommand(currentLine);
-            setCurrentLine('');
-            setHistoryIndex(-1);
-        } else if (e.key === 'Backspace') {
-            if (currentLine.length > 0) {
-                term.write('\b \b');
-                setCurrentLine(currentLine.slice(0, -1));
+    // Initialize terminal on mount
+    if (terminalRef.current && !xterm.current) {
+        const term = new XTerminal({
+            cursorBlink: true,
+            fontFamily: "'Source Code Pro', monospace",
+            fontSize: 14,
+            allowProposedApi: true,
+        });
+        xterm.current = term;
+
+        const addon = new FitAddon();
+        fitAddon.current = addon;
+        term.loadAddon(addon);
+        term.open(terminalRef.current);
+        
+        term.onKey(({ key, domEvent: e }) => {
+            if (e.key === 'Enter') {
+                executeCommand(currentLine);
+                setCurrentLine('');
+                setHistoryIndex(-1);
+            } else if (e.key === 'Backspace') {
+                if (currentLine.length > 0) {
+                    term.write('\b \b');
+                    setCurrentLine(currentLine.slice(0, -1));
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    const newIndex = historyIndex + 1;
+                    setHistoryIndex(newIndex);
+                    const cmd = commandHistory[newIndex];
+                    term.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                    setCurrentLine(cmd);
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    const newIndex = historyIndex - 1;
+                    setHistoryIndex(newIndex);
+                    const cmd = commandHistory[newIndex];
+                    term.write('\x1b[2K\r' + prompt(currentPath) + cmd);
+                    setCurrentLine(cmd);
+                } else {
+                     setHistoryIndex(-1);
+                     term.write('\x1b[2K\r' + prompt(currentPath));
+                     setCurrentLine('');
+                }
             }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (historyIndex < commandHistory.length - 1) {
-                const newIndex = historyIndex + 1;
-                setHistoryIndex(newIndex);
-                const cmd = commandHistory[newIndex];
-                term.write('\x1b[2K\r' + prompt(currentPath) + cmd);
-                setCurrentLine(cmd);
+            else if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+                 if (key >= String.fromCharCode(0x20) && key <= String.fromCharCode(0x7e) || key.length > 1) {
+                    setCurrentLine(currentLine + key);
+                    term.write(key);
+                }
             }
-        } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (historyIndex > 0) {
-                const newIndex = historyIndex - 1;
-                setHistoryIndex(newIndex);
-                const cmd = commandHistory[newIndex];
-                term.write('\x1b[2K\r' + prompt(currentPath) + cmd);
-                setCurrentLine(cmd);
-            } else {
-                 setHistoryIndex(-1);
-                 term.write('\x1b[2K\r' + prompt(currentPath));
-                 setCurrentLine('');
-            }
-        }
-        else if (!e.ctrlKey && !e.altKey && !e.metaKey) {
-             if (key >= String.fromCharCode(0x20) && key <= String.fromCharCode(0x7e) || key.length > 1) {
-                setCurrentLine(currentLine + key);
-                term.write(key);
+        });
+
+        term.writeln('Welcome to CodeVerse Terminal!');
+        term.writeln("Type 'help' for a list of available commands.");
+        term.write(prompt(currentPath));
+    }
+
+    // Set up ResizeObserver to handle fitting
+    const resizeObserver = new ResizeObserver(() => {
+        if(terminalRef.current && terminalRef.current.clientWidth > 0 && fitAddon.current) {
+            try {
+                fitAddon.current.fit();
+            } catch(e) {
+                 // Can safely ignore fit errors on rapid resize
             }
         }
     });
 
-    term.writeln('Welcome to CodeVerse Terminal!');
-    term.writeln("Type 'help' for a list of available commands.");
-    term.write(prompt(currentPath));
+    if (terminalRef.current) {
+        resizeObserver.observe(terminalRef.current);
+    }
 
     return () => {
-      term.dispose();
-      xterm.current = null;
+      if (terminalRef.current) {
+        resizeObserver.unobserve(terminalRef.current);
+      }
+      if (xterm.current) {
+        // Only dispose if it's truly the last unmount
+        // xterm.current.dispose();
+        // xterm.current = null;
+      }
     };
   }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
-    // This effect handles resizing and theme changes when the terminal becomes active or theme changes.
+    // This effect handles theme changes.
     if (xterm.current) {
-        // Apply theme
         xterm.current.options.theme = theme === 'dark' ? {
             background: "#2C3333",
             foreground: "#FFFFFF",
@@ -300,19 +321,11 @@ export function Terminal({
             selectionBackground: "#ADD8E6",
             selectionForeground: "#000000",
         };
-
-        // Fit the terminal if it's the active one
-        if (activeTerminalId === terminal._id && fitAddon.current && terminalRef.current?.clientWidth > 0) {
-            try {
-                fitAddon.current.fit();
-            } catch(e) {
-                // Safely ignore potential fit errors during theme change/activation
-            }
-        }
     }
-  }, [activeTerminalId, terminal._id, theme]);
+  }, [theme]);
   
   useEffect(() => {
+    // Effect to run external commands (like from code runner)
     if (commandToRun && xterm.current) {
       xterm.current.write(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun.command}\x1b[0m`);
       executeCommand(commandToRun.command);
@@ -321,6 +334,7 @@ export function Terminal({
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
   
   useEffect(() => {
+    // Effect to append output (like from code runner)
     if (outputToAppend?.id && xterm.current && xterm.current.element) {
         xterm.current.write(outputToAppend.content);
         xterm.current.write(prompt(currentPath));
@@ -329,6 +343,7 @@ export function Terminal({
   }, [outputToAppend, outputAppended, currentPath]);
 
     useEffect(() => {
+        // Effect to update prompt when path changes
         if (xterm.current) {
             xterm.current.write('\x1b[2K\r' + prompt(currentPath) + currentLine);
         }
