@@ -287,7 +287,9 @@ export function Terminal({
             fitAddon.current?.fit();
         }
     });
-    resizeObserver.observe(terminalRef.current);
+    if (terminalRef.current) {
+      resizeObserver.observe(terminalRef.current);
+    }
     
     return () => {
       resizeObserver.disconnect();
