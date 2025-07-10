@@ -1,8 +1,9 @@
+
 'use client'
 
 import { GitBranch, Check, X, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useFileSystem } from '@/hooks/use-file-system'
-import { getLanguageFromFilename } from '@/config/languages'
+import { getLanguageConfigFromFilename } from '@/config/languages'
 import { useEditorStore } from '@/hooks/use-editor-store'
 import {
     Tooltip,
@@ -17,7 +18,7 @@ import { useProblemsStore } from '@/hooks/use-problems-store'
 const StatusBarItem = ({ children, tooltip, className }: { children: React.ReactNode, tooltip: string, className?: string }) => (
     <Tooltip>
         <TooltipTrigger asChild>
-            <div className={`flex items-center space-x-1 px-2 rounded hover:bg-black/10 cursor-pointer h-full ${className}`}>
+            <div className={`flex items-center space-x-1 px-2 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer h-full ${className}`}>
                 {children}
             </div>
         </TooltipTrigger>
@@ -64,17 +65,19 @@ export function StatusBar() {
     <TooltipProvider>
     <div className="flex items-center justify-between h-6 px-2 text-xs bg-muted/50 text-muted-foreground border-t flex-shrink-0">
       <div className="flex items-center h-full">
-         {problems.length > 0 ? (
-          <Button variant="destructive" size="sm" className="h-full rounded-none px-2 flex items-center gap-1 text-white">
-            <X size={14}/>
-            <span>{problems.length} {problems.length === 1 ? 'Issue' : 'Issues'}</span>
-          </Button>
-        ) : (
-           <StatusBarItem tooltip="No problems detected">
-              <Check size={14} />
-              <span className='hidden sm:inline'>No Issues</span>
+         <StatusBarItem tooltip="No problems detected">
+              {problems.length > 0 ? (
+                <div className='flex items-center gap-1 text-destructive'>
+                  <X size={14}/>
+                  <span>{problems.length}</span>
+                </div>
+              ) : (
+                <div className='flex items-center gap-1 text-muted-foreground'>
+                  <Check size={14} />
+                  <span className='hidden sm:inline'>No Issues</span>
+                </div>
+              )}
           </StatusBarItem>
-        )}
         <StatusBarItem tooltip="Source Control (main branch)">
             <GitBranch className="h-4 w-4" />
             <span>main</span>
@@ -94,7 +97,7 @@ export function StatusBar() {
         )}
         {activeFile?.name && (
           <StatusBarItem tooltip="Select Language Mode">
-            <span className='hidden sm:inline'>{getLanguageFromFilename(activeFile.name).toUpperCase()}</span>
+            <span className='hidden sm:inline'>{getLanguageConfigFromFilename(activeFile.name).name}</span>
           </StatusBarItem>
         )}
         <StatusBarItem tooltip="Select Encoding">
@@ -102,10 +105,6 @@ export function StatusBar() {
         </StatusBarItem>
         <StatusBarItem tooltip="Select End of Line Sequence">
             <span className='hidden sm:inline'>LF</span>
-        </StatusBarItem>
-        <StatusBarItem tooltip="Configure Prettier">
-          <Check className="h-4 w-4" />
-          <span>Prettier</span>
         </StatusBarItem>
       </div>
     </div>

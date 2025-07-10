@@ -354,8 +354,11 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
     setActiveFileId: (fileId) => {
         set(produce((state: FileSystemState) => {
+            if (fileId === state.activeFileId) return;
+
             const fileMap = new Map(state.allFiles.map(f => [f._id, f]));
             
+            // Expand parent folders if a file is activated
             const ancestors = new Set<string>();
             let currentFile = fileId ? fileMap.get(fileId) : null;
             if (currentFile?.parentId) {
@@ -369,6 +372,7 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
             state.expandedFolders = [...new Set([...state.expandedFolders, ...ancestors])];
 
+            // Update active and open states
             state.allFiles.forEach(f => {
                 f.isActive = f._id === fileId;
                 if(f.isActive && !f.isFolder) {
@@ -376,7 +380,10 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 }
             });
             state.activeFileId = fileId;
-            state.files = buildFileTree(state.allFiles);
+            // Rebuild tree only if folder expansion changed
+            if (ancestors.size > 0) {
+                state.files = buildFileTree(state.allFiles);
+            }
         }));
     },
     

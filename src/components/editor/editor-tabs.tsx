@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useMemo } from 'react'
@@ -48,23 +49,25 @@ export function EditorTabs() {
   }
   
   const handleTabClick = (file: FileType) => {
-    setActiveFileId(file._id);
-    router.push(`/editor/${file._id}`);
+    if (file._id !== activeFileId) {
+        setActiveFileId(file._id);
+        router.push(`/editor/${file._id}`);
+    }
   }
 
   if (openFiles.length === 0) return <div className="h-[40px] bg-card border-b"></div>
 
   return (
     <div className="flex items-center justify-between bg-card border-b h-[40px]">
-      <div className="flex items-center">
+      <div className="flex items-center overflow-x-auto">
         {openFiles.map((file) => (
           <div
             key={file._id}
-            className={`flex items-center px-3 h-[40px] text-sm border-r cursor-pointer group ${activeFileId === file._id ? 'bg-background text-foreground' : 'bg-card text-muted-foreground hover:bg-background'}`}
+            className={`flex-shrink-0 flex items-center px-3 h-[40px] text-sm border-r cursor-pointer group ${activeFileId === file._id ? 'bg-background text-foreground' : 'bg-card text-muted-foreground hover:bg-background'}`}
             onClick={() => handleTabClick(file)}
           >
             <FileIcon filename={file.name} className="h-4 w-4 mr-2" />
-            <span className="mr-2">{file.name}</span>
+            <span className="mr-2 whitespace-nowrap">{file.name}</span>
             <button
               className={`p-1 rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground ${activeFileId === file._id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
               onClick={(e) => handleCloseTab(e, file)}
