@@ -277,28 +277,9 @@ export function Terminal({
     term.writeln("Type 'help' for a list of available commands.");
     term.write(prompt(currentPath));
 
-    // This ResizeObserver is the key to fixing the crash.
-    // It ensures fit() is only called when the element is in the DOM and has a size.
-    const resizeObserver = new ResizeObserver(() => {
-        if (fitAddon.current && terminalRef.current?.clientWidth > 0) {
-            try {
-                fitAddon.current.fit();
-            } catch(e) {
-                // This can still fail in some edge cases, but we can safely ignore it.
-            }
-        }
-    });
-
-    if (terminalRef.current) {
-        resizeObserver.observe(terminalRef.current);
-    }
-
     return () => {
       term.dispose();
       xterm.current = null;
-      if (terminalRef.current) {
-          resizeObserver.unobserve(terminalRef.current);
-      }
     };
   }, []); // Empty dependency array ensures this runs only once on mount
 
@@ -340,7 +321,7 @@ export function Terminal({
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
   
   useEffect(() => {
-    if (outputToAppend?.id && xterm.current) {
+    if (outputToAppend?.id && xterm.current && xterm.current.element) {
         xterm.current.write(outputToAppend.content);
         xterm.current.write(prompt(currentPath));
         outputAppended();
