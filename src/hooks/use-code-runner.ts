@@ -15,7 +15,8 @@ export function useCodeRunner() {
 
   const runActiveFile = async () => {
     // Get the fresh state directly from the store inside the handler
-    const activeFile = useFileSystem.getState().activeFile;
+    const activeFileId = useFileSystem.getState().activeFileId;
+    const activeFile = activeFileId ? useFileSystem.getState().findFile(activeFileId) : null;
     
     if (!activeFile || activeFile.isFolder) {
         toast.error("No runnable file selected.");

@@ -276,17 +276,19 @@ export function Terminal({
     xterm.current.writeln("Type 'help' for a list of available commands.");
     xterm.current.write(prompt(currentPath));
     
-    // Initial fit
-    if (terminalRef.current.clientHeight > 0) {
-        fitAddon.current?.fit();
-    }
-    
-    const resizeObserver = new ResizeObserver(() => {
-        // Only fit if the terminal is actually visible and has a size
-        if (terminalRef.current && terminalRef.current.clientHeight > 0) {
-            fitAddon.current?.fit();
-        }
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+          try {
+              fitAddon.current?.fit();
+          } catch (e) {
+              // This catch can prevent the rare "Cannot read properties of undefined (reading 'dimensions')"
+              // if a resize happens at an awkward time.
+              console.warn("Minor resize error ignored:", e);
+          }
+      }
     });
+    
     if (terminalRef.current) {
       resizeObserver.observe(terminalRef.current);
     }
@@ -294,6 +296,7 @@ export function Terminal({
     return () => {
       resizeObserver.disconnect();
       xterm.current?.dispose();
+      xterm.current = null;
     };
   }, []);
 
