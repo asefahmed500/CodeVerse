@@ -280,11 +280,16 @@ export function Terminal({
       const entry = entries[0];
       if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
           try {
-              fitAddon.current?.fit();
+              if (fitAddon.current && xterm.current) {
+                // This check ensures we don't try to fit if terminal isn't fully ready
+                if (xterm.current.element && xterm.current.element.clientWidth > 0) {
+                    fitAddon.current.fit();
+                }
+              }
           } catch (e) {
               // This catch can prevent the rare "Cannot read properties of undefined (reading 'dimensions')"
               // if a resize happens at an awkward time.
-              console.warn("Minor resize error ignored:", e);
+              console.warn("Minor terminal resize error caught and ignored:", e);
           }
       }
     });
