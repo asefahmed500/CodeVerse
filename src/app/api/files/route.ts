@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import dbConnect from "@/lib/db";
 import File from "@/models/file";
-import type { FileType } from "@/types";
+import type { IFile } from "@/models/file";
 import mongoose from "mongoose";
 
 const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string): Promise<mongoose.Types.ObjectId[]> => {
@@ -11,7 +11,8 @@ const findDescendants = async (fileId: mongoose.Types.ObjectId, userId: string):
     
     while(queue.length > 0) {
         const currentId = queue.shift()!;
-        const children = await File.find({ parentId: currentId, userId });
+        // Optimize projection to only get necessary fields
+        const children = await File.find({ parentId: currentId, userId }, '_id isFolder');
         for (const child of children) {
             descendants.push(child._id);
             if (child.isFolder) {
@@ -34,13 +35,12 @@ export async function GET(request: Request) {
         await dbConnect();
         const files = await File.find({ userId }).lean();
         
+        // Sanitize files for client consumption, converting ObjectIDs to strings
         const sanitizedFiles = files.map(file => ({
             ...file,
             _id: file._id.toString(),
             userId: file.userId.toString(),
             parentId: file.parentId ? file.parentId.toString() : null,
-            isOpen: false,
-            isActive: false,
         }));
         
         return NextResponse.json(sanitizedFiles);
@@ -74,9 +74,9 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: "Original item not found or permission denied" }, { status: 404 });
             }
 
-            const duplicateRecursively = async (node: any, parentId: string | null): Promise<any> => {
+            const duplicateRecursively = async (node: any, newParentId: mongoose.Types.ObjectId | null): Promise<any> => {
                 const newId = new mongoose.Types.ObjectId();
-                const siblingNames = (await File.find({ parentId: parentId, userId }).lean()).map(f => f.name);
+                const siblingNames = (await File.find({ parentId: newParentId, userId }).lean()).map(f => f.name);
 
                 let newName = node.name;
                 
@@ -102,45 +102,52 @@ export async function POST(request: Request) {
                     newName = candidateName;
                 }
 
-                const newNodeData = {
-                    ...node,
+                const newNodeData: Partial<IFile> = {
                     _id: newId,
-                    userId,
-                    parentId,
+                    userId: new mongoose.Types.ObjectId(userId),
+                    parentId: newParentId,
+                    name: newName,
+                    content: node.content,
+                    isFolder: node.isFolder,
+                    language: node.language,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 };
-                delete newNodeData.children;
-
+                
                 const newNodeDoc = await File.create(newNodeData);
                 const newNode = newNodeDoc.toObject();
 
-                if (node.isFolder) {
-                    const children = await File.find({ parentId: node._id, userId });
-                    newNode.children = [];
-                    for (const child of children) {
-                        const newChild = await duplicateRecursively(child.toObject(), newId.toString());
-                        newNode.children.push(newChild);
-                    }
-                }
-                return {
+                const resultNode = {
                     ...newNode,
                     _id: newNode._id.toString(),
                     parentId: newNode.parentId ? newNode.parentId.toString() : null,
+                    children: [] as any[],
                 };
+
+                if (node.isFolder) {
+                    const children = await File.find({ parentId: node._id, userId }).lean();
+                    for (const child of children) {
+                        const newChild = await duplicateRecursively(child, newNode._id);
+                        resultNode.children.push(newChild);
+                    }
+                }
+
+                return resultNode;
             };
             
-            const duplicated = await duplicateRecursively(original, original.parentId ? original.parentId.toString() : null);
+            const duplicated = await duplicateRecursively(original, original.parentId);
             return NextResponse.json(duplicated, { status: 201 });
         }
 
         if (action === 'bulkCreate') {
             const { items } = await request.json(); 
+            // Clear existing workspace before cloning a new one
             await File.deleteMany({ userId });
             
             const createdItems = [];
             const pathIdMap = new Map<string, string>();
-            items.sort((a: any, b: any) => a.path.localeCompare(b.path)); 
+            // Sort by path depth to ensure parents are created before children
+            items.sort((a: any, b: any) => a.path.split('/').length - b.path.split('/').length); 
 
             for (const item of items) {
                 const parts = item.path.split('/');
@@ -152,7 +159,7 @@ export async function POST(request: Request) {
                     ...item,
                     name: itemName,
                     userId,
-                    parentId,
+                    parentId: parentId ? new mongoose.Types.ObjectId(parentId) : null,
                 });
                 const savedItem = await newItem.save();
                 const savedObject = savedItem.toObject();
@@ -165,6 +172,7 @@ export async function POST(request: Request) {
             return NextResponse.json(createdItems, { status: 201 });
         }
         
+        // Default action: Create a single file/folder
         const fileData = await request.json();
         const newFile = new File({
             ...fileData,
@@ -199,9 +207,14 @@ export async function PUT(request: Request) {
     try {
         await dbConnect();
         const updates = await request.json();
-        updates.updatedAt = new Date();
+        // Prevent client from updating internal/protected fields
         delete updates.isOpen;
         delete updates.isActive;
+        delete updates.children;
+        delete updates._id;
+        delete updates.userId;
+
+        updates.updatedAt = new Date();
 
         const updatedFile = await File.findOneAndUpdate(
             { _id: fileId, userId },
@@ -212,7 +225,20 @@ export async function PUT(request: Request) {
         if (!updatedFile) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
-        return NextResponse.json({ ...updatedFile, _id: updatedFile._id.toString(), parentId: updatedFile.parentId?.toString() || null });
+        
+        // Return a minimal object to avoid overwriting client-side state
+        const responseData = {
+          _id: updatedFile._id.toString(),
+          parentId: updatedFile.parentId?.toString() || null,
+          name: updatedFile.name,
+          content: updatedFile.content,
+          isFolder: updatedFile.isFolder,
+          language: updatedFile.language,
+          createdAt: updatedFile.createdAt,
+          updatedAt: updatedFile.updatedAt
+        };
+
+        return NextResponse.json(responseData);
     } catch (error) {
         console.error("PUT /api/files Error:", error);
         if (error instanceof mongoose.Error.ValidationError) {
@@ -254,11 +280,11 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "File not found or permission denied" }, { status: 404 });
         }
         
-        let idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
+        const idsToDelete: mongoose.Types.ObjectId[] = [fileToDelete._id];
         
         if (fileToDelete.isFolder) {
             const descendantIds = await findDescendants(fileToDelete._id, userId);
-            idsToDelete = idsToDelete.concat(descendantIds);
+            idsToDelete.push(...descendantIds);
         }
 
         const uniqueIds = [...new Set(idsToDelete.map(id => id.toString()))];

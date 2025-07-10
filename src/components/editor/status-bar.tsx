@@ -11,7 +11,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
   } from "@/components/ui/tooltip"
-import { Button } from '../ui/button'
 import React, { useEffect, useState } from 'react'
 import { useProblemsStore } from '@/hooks/use-problems-store'
   
@@ -65,7 +64,7 @@ export function StatusBar() {
     <TooltipProvider>
     <div className="flex items-center justify-between h-6 px-2 text-xs bg-muted/50 text-muted-foreground border-t flex-shrink-0">
       <div className="flex items-center h-full">
-         <StatusBarItem tooltip="No problems detected">
+         <StatusBarItem tooltip={problems.length > 0 ? `${problems.length} problems` : "No problems detected"}>
               {problems.length > 0 ? (
                 <div className='flex items-center gap-1 text-destructive'>
                   <X size={14}/>

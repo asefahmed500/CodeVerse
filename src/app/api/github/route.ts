@@ -1,13 +1,26 @@
+
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { Octokit } from "octokit";
 
+// A more robust list of text file extensions and known config filenames
 const textFileExtensions = [
-    '.js', '.jsx', '.ts', '.tsx', '.json', '.css', '.scss', '.html', '.htm', 
+    '.js', '.jsx', '.ts', '.tsx', '.json', '.css', '.scss', '.less', '.html', '.htm', 
     '.md', '.txt', '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', 
     '.php', '.rb', '.rs', '.sh', '.yml', '.yaml', '.xml', '.toml', '.ini',
-    '.env', '.babelrc', '.eslintrc', '.prettierrc', 'package.json', 'tsconfig.json'
+    '.env', 'LICENSE', 'README', 'Makefile', 'Dockerfile', 'Procfile', '.gitignore',
+    '.npmrc', '.nvmrc', 'webpack.config.js', 'babel.config.js', 'postcss.config.js'
 ];
+
+const knownFilenames = [
+    '.babelrc', '.eslintrc', '.prettierrc', 'package.json', 'tsconfig.json', 'gemfile', 'rakefile', 'poetry.lock', 'pnpm-lock.yaml', 'package-lock.json', 'yarn.lock'
+];
+
+const isTextFile = (fileName: string) => {
+    const lowerFileName = fileName.toLowerCase();
+    if (knownFilenames.some(known => lowerFileName.endsWith(known))) return true;
+    return textFileExtensions.some(ext => lowerFileName.endsWith(ext));
+};
 
 async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, path: string = ''): Promise<{ path: string, content?: string, type: 'file' | 'dir' }[]> {
     try {
@@ -15,14 +28,15 @@ async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, 
         const contents = response.data;
 
         if (!Array.isArray(contents)) {
-            if (contents.type === 'file' && contents.content) {
+            // This case handles getting a single file's content directly
+            if (contents.type === 'file' && contents.content && isTextFile(contents.name)) {
                 return [{ 
                     path: contents.path, 
                     content: Buffer.from(contents.content, 'base64').toString('utf-8'),
                     type: 'file'
                 }];
             }
-            return [];
+            return []; // Ignore single binary files
         }
 
         const items: { path: string, content?: string, type: 'file' | 'dir' }[] = [];
@@ -31,12 +45,17 @@ async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, 
                 items.push({ path: item.path, type: 'dir' });
                 const subItems = await fetchRepoContents(octokit, owner, repo, item.path);
                 items.push(...subItems);
-            } else if (item.type === 'file' && item.download_url && textFileExtensions.some(ext => item.name.endsWith(ext) || item.name.toLowerCase().includes(ext.slice(1)))) {
+            } else if (item.type === 'file' && item.download_url && isTextFile(item.name)) {
                  try {
-                    const fileResponse = await fetch(item.download_url);
-                    if(fileResponse.ok) {
-                        const content = await fileResponse.text();
-                        items.push({ path: item.path, content, type: 'file' });
+                    // Only fetch content for reasonably sized text files to avoid memory issues
+                    if (item.size < 1000000) { // 1MB limit per file
+                        const fileResponse = await fetch(item.download_url);
+                        if(fileResponse.ok) {
+                            const content = await fileResponse.text();
+                            items.push({ path: item.path, content, type: 'file' });
+                        }
+                    } else {
+                        console.warn(`Skipping large file: ${item.path}`);
                     }
                 } catch (e) {
                     console.warn(`Skipping file ${item.path} due to fetch error.`);
@@ -46,10 +65,10 @@ async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, 
         return items;
     } catch (error: any) {
         if (error.status === 404) {
-            console.warn(`Path not found: ${path}. Skipping.`);
+            console.warn(`Path not found during GitHub clone: ${path}. Skipping.`);
             return [];
         }
-        throw error;
+        throw error; // Re-throw other errors to be main handler
     }
 }
 
@@ -58,7 +77,7 @@ export async function GET(request: Request) {
   const session = await auth();
 
   if (!(session?.user as any)?.accessToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "GitHub account not connected or unauthorized" }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -75,7 +94,7 @@ export async function GET(request: Request) {
         const owner = searchParams.get("owner");
         const repo = searchParams.get("repo");
         if (!owner || !repo) {
-            return NextResponse.json({ error: "Missing owner or repo" }, { status: 400 });
+            return NextResponse.json({ error: "Missing repository owner or name" }, { status: 400 });
         }
         const items = await fetchRepoContents(octokit, owner, repo);
         const mappedItems = items.map(item => ({
@@ -86,12 +105,12 @@ export async function GET(request: Request) {
         return NextResponse.json(mappedItems);
 
       default:
-        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+        return NextResponse.json({ error: "Invalid action specified" }, { status: 400 });
     }
   } catch (error: any) {
-    console.error("GitHub GET Error:", error);
+    console.error("GitHub API Error:", error);
     return NextResponse.json(
-      { error: error.message || "GitHub operation failed" },
+      { error: error.message || "An unexpected error occurred with the GitHub API" },
       { status: error.status || 500 }
     );
   }
