@@ -277,47 +277,64 @@ export function Terminal({
     term.writeln("Type 'help' for a list of available commands.");
     term.write(prompt(currentPath));
 
+    // This ResizeObserver is the key to fixing the crash.
+    // It ensures fit() is only called when the element is in the DOM and has a size.
+    const resizeObserver = new ResizeObserver(() => {
+        if (fitAddon.current && terminalRef.current?.clientWidth > 0) {
+            try {
+                fitAddon.current.fit();
+            } catch(e) {
+                // This can still fail in some edge cases, but we can safely ignore it.
+            }
+        }
+    });
+
+    if (terminalRef.current) {
+        resizeObserver.observe(terminalRef.current);
+    }
+
     return () => {
       term.dispose();
       xterm.current = null;
+      if (terminalRef.current) {
+          resizeObserver.unobserve(terminalRef.current);
+      }
     };
   }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
-      // This effect is crucial. It runs when this terminal becomes active.
-      // We check if the addon is ready and the container div has a clientWidth
-      // to avoid the 'dimensions' crash.
-      if (activeTerminalId === terminal._id && fitAddon.current && terminalRef.current?.clientWidth > 0) {
-        try {
-            fitAddon.current.fit();
-        } catch(e) {
-            // Ignore potential errors during fitting
-        }
-      }
-  }, [activeTerminalId, terminal._id]);
-
-  useEffect(() => {
+    // This effect handles resizing and theme changes when the terminal becomes active or theme changes.
     if (xterm.current) {
+        // Apply theme
         xterm.current.options.theme = theme === 'dark' ? {
-            background: "#2C3333", // Dark Slate Gray
+            background: "#2C3333",
             foreground: "#FFFFFF",
             cursor: "#FFFFFF",
-            selectionBackground: "#00FFFF", // Cyan
+            selectionBackground: "#00FFFF",
             selectionForeground: "#000000",
         } : {
             background: "#FFFFFF",
             foreground: "#000000",
             cursor: "#000000",
-            selectionBackground: "#ADD8E6", // Light Blue
+            selectionBackground: "#ADD8E6",
             selectionForeground: "#000000",
         };
+
+        // Fit the terminal if it's the active one
+        if (activeTerminalId === terminal._id && fitAddon.current && terminalRef.current?.clientWidth > 0) {
+            try {
+                fitAddon.current.fit();
+            } catch(e) {
+                // Safely ignore potential fit errors during theme change/activation
+            }
+        }
     }
-  }, [theme]);
+  }, [activeTerminalId, terminal._id, theme]);
   
   useEffect(() => {
     if (commandToRun && xterm.current) {
-      xterm.current.write(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun}\x1b[0m`);
-      executeCommand(commandToRun);
+      xterm.current.write(`\r\n\x1b[1;32m${prompt(currentPath)}${commandToRun.command}\x1b[0m`);
+      executeCommand(commandToRun.command);
       commandProcessed();
     }
   }, [commandToRun, commandProcessed, executeCommand, currentPath]);
