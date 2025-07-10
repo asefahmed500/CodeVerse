@@ -9,7 +9,7 @@ export interface FileType {
   isActive: boolean
   createdAt: Date
   updatedAt: Date
-  children?: FileType[]
+  children?: (FileType & { children?: FileType[] })[]
 }
 
 export interface TerminalSessionType {

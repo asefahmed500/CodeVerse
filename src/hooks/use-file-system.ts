@@ -281,9 +281,8 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             }
             
             const { deletedIds } = await res.json();
-            
             let nextActiveFileId: string | null = get().activeFileId;
-
+            
             set(produce((state: FileSystemState) => {
                 const wasActiveFileDeleted = deletedIds.includes(state.activeFileId);
                 
@@ -291,8 +290,13 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
                 if (wasActiveFileDeleted) {
                     const openFiles = state.allFiles.filter(f => f.isOpen && !f.isFolder);
-                    openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-                    nextActiveFileId = openFiles.length > 0 ? openFiles[0]._id : null;
+                    // This logic is crucial: find the most recently used file among the REMAINING open files.
+                    if (openFiles.length > 0) {
+                        openFiles.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                        nextActiveFileId = openFiles[0]._id;
+                    } else {
+                        nextActiveFileId = null;
+                    }
                 } else {
                     nextActiveFileId = state.activeFileId;
                 }
@@ -300,6 +304,10 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 state.activeFileId = nextActiveFileId;
                 state.allFiles.forEach(f => {
                     f.isActive = f._id === nextActiveFileId;
+                    // Ensure deleted files are no longer marked as open
+                    if (deletedIds.includes(f._id)) {
+                        f.isOpen = false;
+                    }
                 });
                 
                 state.files = buildFileTree(state.allFiles);
@@ -331,9 +339,9 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
                 throw new Error(data.error || "Failed to duplicate item.");
             }
             
-            const duplicatedItem: FileType = await res.json();
+            const duplicatedItem: FileType & { children?: FileType[] } = await res.json();
             
-            const flattenChildren = (node: FileType): FileType[] => {
+            const flattenChildren = (node: FileType & { children?: FileType[] }): FileType[] => {
                 let flat: FileType[] = [{...node, children: undefined, isOpen: false, isActive: false }];
                 if (node.children) {
                     node.children.forEach(child => {
@@ -358,12 +366,14 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
     setActiveFileId: (fileId) => {
         set(produce((state: FileSystemState) => {
-            if (fileId === state.activeFileId) return;
+            if (fileId === state.activeFileId && fileId !== null) return;
+            
+            state.activeFileId = fileId;
 
             const fileMap = new Map(state.allFiles.map(f => [f._id, f]));
-            
             const ancestors = new Set<string>();
             let currentFile = fileId ? fileMap.get(fileId) : null;
+            
             if (currentFile?.parentId) {
                 let parentId = currentFile.parentId;
                 while(parentId) {
@@ -374,16 +384,14 @@ const useFileSystemStore = create<FileSystemState>((set, get) => ({
             }
 
             state.expandedFolders = [...new Set([...state.expandedFolders, ...ancestors])];
-
-            // Update active and open states
+            
             state.allFiles.forEach(f => {
                 f.isActive = f._id === fileId;
                 if(f.isActive && !f.isFolder) {
                     f.isOpen = true;
                 }
             });
-            state.activeFileId = fileId;
-            // Rebuild tree if folder expansion changed
+
             if (ancestors.size > 0 && state.files.length > 0) {
                 state.files = buildFileTree(state.allFiles);
             }
