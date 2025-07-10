@@ -68,7 +68,7 @@ async function fetchRepoContents(octokit: Octokit, owner: string, repo: string, 
             console.warn(`Path not found during GitHub clone: ${path}. Skipping.`);
             return [];
         }
-        throw error; // Re-throw other errors to be caught by the main handler
+        throw error; // Re-throw other errors to be main handler
     }
 }
 
