@@ -1,0 +1,83 @@
+# CodeVerse IDE - Technical Documentation
+
+This document provides a high-level overview of the technical architecture of the CodeVerse application. It explains the core components, data flow, APIs, and state management hooks that power the IDE.
+
+---
+
+## 1. Core Technologies
+
+-   **Frontend**: Next.js (App Router), React, TypeScript
+-   **UI**: ShadCN UI Components, Tailwind CSS
+-   **Code Editor**: Monaco Editor (the engine behind VS Code)
+-   **Backend**: Next.js API Routes (serverless functions)
+-   **Database**: MongoDB (managed via Mongoose)
+-   **Authentication**: NextAuth.js (with GitHub & credentials providers)
+-   **Code Execution**: Judge0 (via a RapidAPI proxy)
+-   **State Management**: Zustand (a lightweight, modern state manager for React)
+
+---
+
+## 2. Client-Side Architecture & State Management (Zustand Hooks)
+
+The application's state is primarily managed by a set of Zustand stores (hooks). This keeps the UI reactive and decouples state logic from the components.
+
+### Key Hooks (`src/hooks/`):
+
+-   **`useFileSystem`**: This is the most critical state manager.
+    -   **Responsibility**: Holds the entire workspace state, including the file tree (`files`), a flat list of all files (`allFiles`), the `activeFileId`, and which folders are `expandedFolders`.
+    -   **API Interaction**: It is the primary client-side consumer of the `/api/files` endpoint. It handles fetching, creating, updating, and deleting files.
+    -   **UI Link**: It directly feeds the `Explorer` component and provides the `Editor` with the content of the active file.
+
+-   **`useActiveView`**: A simple store to control UI visibility.
+    -   **Responsibility**: Manages which main view is currently visible in the sidebar (e.g., `'explorer'`, `'search'`, `'github'`) and which panel is open at the bottom (`'terminal'`, `'problems'`).
+    -   **UI Link**: Used by `ActivityBar` to highlight the active icon and by `SidebarView` and `Panel` to conditionally render the correct component.
+
+-   **`useEditorStore`**: Manages the state of the Monaco Editor instance.
+    -   **Responsibility**: Holds a reference to the live editor instance, the cursor position, and the location of all breakpoints.
+    -   **UI Link**: Used by the `Editor` component to apply breakpoints and by the `StatusBar` to display the current line/column.
+
+-   **`useTerminalManager`**: Manages all terminal instances.
+    -   **Responsibility**: Keeps track of all open terminal tabs, their command history, and which one is currently active.
+    -   **UI Link**: Used by the `TerminalManager` component to render the tabs and the active `Terminal` component.
+
+-   **`useCodeRunner`**: A utility hook that orchestrates code execution.
+    -   **Responsibility**: Takes the active file's content, sends it to the `executeCode` utility, and then dispatches the output to the correct terminal instance. It also populates the `useProblemsStore`.
+
+---
+
+## 3. Backend Architecture (API Routes)
+
+The backend is built with Next.js API Routes, which are serverless functions.
+
+### Key API Endpoints (`src/api/`):
+
+-   **`/api/files`**: The primary RESTful API for all file system operations.
+    -   **`GET`**: Fetches all files for the authenticated user.
+    -   **`POST`**: Creates a new file or folder. Also handles bulk creation for GitHub cloning.
+    -   **`PUT`**: Updates a file's content or name.
+    -   **`DELETE`**: Deletes a file or an entire folder and its descendants.
+    -   **Database Link**: This API directly interacts with the `File` model in MongoDB, ensuring all operations are sandboxed to the authenticated user's `userId`.
+
+-   **`/api/run`**: Handles code execution requests.
+    -   **Responsibility**: Acts as a secure proxy between the IDE and the Judge0 API. It receives code from the client, forwards it to Judge0 with the necessary API key (from environment variables), and returns the execution result.
+    -   **Security**: This prevents the Judge0 API key from ever being exposed to the client's browser.
+
+-   **`/api/github`**: Handles all interactions with the GitHub API.
+    -   **Responsibility**: Acts as a secure proxy for cloning repositories (`getRepoTree`) and pushing changes. It uses the user's OAuth access token to interact with the GitHub API on their behalf.
+
+-   **`/api/auth/[...nextauth]`**: Manages all authentication logic (sign-in, sign-out, session management) via the NextAuth.js library.
+
+---
+
+## 4. Data Flow Example: Running a File
+
+Here is the step-by-step flow when a user clicks the "Run" button:
+
+1.  **UI Event**: The user clicks the "Run" button in the `TitleBar`.
+2.  **Hook Call**: This triggers the `runActiveFile` function from the `useCodeRunner` hook.
+3.  **Get File Content**: `useCodeRunner` gets the currently active file's content from the `useFileSystem` store.
+4.  **API Request**: The `executeCode` utility function is called, which sends a `POST` request to the `/api/run` endpoint with the code and language ID.
+5.  **Backend Proxy**: The `/api/run` route on the server receives the request. It securely adds the `JUDGE0_API_KEY` and forwards the request to the real Judge0 API.
+6.  **Code Execution**: Judge0 compiles and runs the code in a sandbox and returns the result (stdout, stderr, errors) to the Next.js backend.
+7.  **API Response**: The backend forwards the execution result back to the client.
+8.  **State Update & UI Render**: The `useCodeRunner` hook receives the result. It calls `appendOutput` from the `useTerminalStore`, which updates its state. The `Terminal` component, listening to this store, sees the new output and writes it to the screen. If there are errors, they are added to the `useProblemsStore`.
